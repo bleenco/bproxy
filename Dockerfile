@@ -10,7 +10,6 @@ COPY ./include /bproxy/include
 COPY ./src /bproxy/src
 COPY Makefile /bproxy/Makefile
 COPY bproxy.json /bproxy/bproxy.json
-COPY libs/libuv.a /usr/lib/
 
 RUN make static
 
