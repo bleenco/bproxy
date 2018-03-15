@@ -10,6 +10,9 @@ all: checkdir bproxy
 static: checkdir bproxy_static
 recompile: clean checkdir bproxy
 
+install:
+	cp build/bproxy /usr/local/bin/bproxy
+
 bproxy: jsmn.o http_parser.o http.o config.o
 	$(CC) $(CFLAGS) $(DEPS) -o $(TARGET) src/bproxy.c $(LIBS)
 
