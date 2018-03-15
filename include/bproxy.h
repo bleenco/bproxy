@@ -57,7 +57,7 @@ static void write_buf(uv_stream_t *handle, char *data, int len);
 void proxy_close_cb(uv_handle_t *peer);
 void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
 void proxy_connect_cb(uv_connect_t *req, int status);
-void proxy_connection(char *ip, unsigned short port, conn_t *conn);
+void proxy_http_request(char *ip, unsigned short port, conn_t *conn);
 
 static void write_cb(uv_write_t *req, int status);
 static void close_cb(uv_handle_t *peer);

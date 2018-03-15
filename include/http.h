@@ -47,6 +47,8 @@ typedef struct conn_t
   http_parser *parser;
   http_request_t *request;
   uv_stream_t *handle;
+  boolean ws_handshake_sent;
+  uv_stream_t *proxy_handle;
 } conn_t;
 
 int message_begin_cb(http_parser *p);
