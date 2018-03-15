@@ -17,7 +17,7 @@ bproxy: jsmn.o http_parser.o http.o config.o
 	$(CC) $(CFLAGS) $(DEPS) -o $(TARGET) src/bproxy.c $(LIBS)
 
 bproxy_static: jsmn.o http_parser.o http.o config.o
-	$(CC) -Wall -Iinclude -O3 -static $(DEPS) -o $(TARGET) src/bproxy.c -lpthread -ldl /usr/lib/libuv.a
+	$(CC) -Wall -Iinclude -O3 -static -pthread -ldl $(DEPS) -o $(TARGET) src/bproxy.c /usr/lib/x86_64-linux-gnu/libuv.a
 
 http_parser.o: checkdir
 	$(CC) $(CFLAGS) -c src/http_parser.c -o build/obj/http_parser.o
