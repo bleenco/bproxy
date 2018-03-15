@@ -332,12 +332,12 @@ void parse_args(int argc, char **argv)
 void usage()
 {
   printf("bproxy v%s\n\n"
-         "Usage: bproxy [-p <port> [-h] -d <domain>]\n"
+         "Usage: bproxy [-c <port> [-h] -d <domain>]\n"
          "\n"
          "Options:\n"
          "\n"
          " -h                Show this help message.\n"
-         " -p <port>         Bind to this port number. Default: 5000\n"
+         " -c <path>         Path to config JSON file. Default: bproxy.json\n"
          "\n"
          "Copyright (c) 2018 Bleenco GmbH https://bleenco.com\n",
          VERSION);
