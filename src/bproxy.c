@@ -1,3 +1,10 @@
+/**
+ * @license
+ * Copyright Bleenco GmbH. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://github.com/bleenco/bproxy
+ */
 #include "bproxy.h"
 
 void conn_init(uv_stream_t *handle)
