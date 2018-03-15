@@ -7,10 +7,14 @@ LIBS = -luv -lpthread -ldl
 .PHONY: all bproxy checkdir clean
 
 all: checkdir bproxy
+static: checkdir bproxy_static
 recompile: clean checkdir bproxy
 
 bproxy: jsmn.o http_parser.o http.o config.o
 	$(CC) $(CFLAGS) $(DEPS) -o $(TARGET) src/bproxy.c $(LIBS)
+
+bproxy_static: jsmn.o http_parser.o http.o config.o
+	$(CC) $(CFLAGS) $(DEPS) -o $(TARGET) src/bproxy.c -lpthread -ldl /usr/local/lib/libuv.a
 
 http_parser.o: checkdir
 	$(CC) $(CFLAGS) -c src/http_parser.c -o build/obj/http_parser.o
