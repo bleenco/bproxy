@@ -12,12 +12,12 @@ void conn_init(uv_stream_t *handle)
   conn_t *conn = malloc(sizeof(conn_t));
   conn->parser = malloc(sizeof(http_parser));
   conn->request = malloc(sizeof(http_request_t));
-  conn->proxy_handle = malloc(sizeof(conn_t));
   conn->proxy_handle = NULL;
   conn->handle = handle;
   handle->data = conn;
   http_parser_init(conn->parser, HTTP_REQUEST);
   conn->parser->data = conn;
+  conn->ws_handshake_sent = false;
 }
 
 void conn_free(uv_handle_t *handle)
@@ -129,7 +129,8 @@ void proxy_connect_cb(uv_connect_t *req, int status)
   proxy_t *proxy_conn = req->handle->data;
   proxy_conn->connect_req = *req;
 
-  if (proxy_conn->conn->ws_handshake_sent) {
+  if (proxy_conn->conn->ws_handshake_sent)
+  {
     proxy_conn->conn->proxy_handle = req->handle;
   }
 
@@ -257,11 +258,32 @@ proxy_ip_port find_proxy_config(char *hostname)
     proxy_config_t *pconf = server->config->proxies[i];
     for (int j = 0; j < pconf->num_hosts; j++)
     {
-      if (strcmp(pconf->hosts[j], hostname) == 0)
+      // Compare hostnames (taking into account asterisk)
+      char *conf_host = pconf->hosts[j];
+      boolean wildcard = conf_host[0] == '*';
+      if (wildcard)
       {
-        ip_port.ip = pconf->ip;
-        ip_port.port = pconf->port;
-        return ip_port;
+        // Skip asterisk
+        conf_host++;
+      }
+
+      ssize_t conf_i = strlen(conf_host) - 1;
+      ssize_t i = strlen(hostname) - 1;
+
+      while ((i >= 0 && conf_i >= 0) && hostname[i] == conf_host[conf_i])
+      {
+        --i;
+        --conf_i;
+      }
+      if (conf_i < 0)
+      {
+        // If wildcard, requested hostname may be longer
+        if (wildcard || i < 0)
+        {
+          ip_port.ip = pconf->ip;
+          ip_port.port = pconf->port;
+          return ip_port;
+        }
       }
     }
   }
