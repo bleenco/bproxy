@@ -1,0 +1,7 @@
+image: bproxy
+
+matrix:
+  - env: COMMAND=make
+
+script:
+  - if [[ "$COMMAND" ]]; then $COMMAND; fi
