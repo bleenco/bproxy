@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://github.com/bleenco/bproxy
  */
 #include "bproxy.h"
+#include "gzip.h"
 
 void conn_init(uv_stream_t *handle)
 {
@@ -87,8 +88,32 @@ void proxy_close_cb(uv_handle_t *peer)
   proxy_t *proxy_conn = peer->data;
   if (proxy_conn)
   {
+    if(proxy_conn->gzip_state)
+    {
+      gzip_free_state(proxy_conn->gzip_state);
+    }
     free(proxy_conn);
   }
+}
+
+void compress_data(proxy_t *proxy_conn, char *data, int len)
+{
+  proxy_conn->gzip_state->raw_body = (unsigned char*) data;
+  proxy_conn->gzip_state->current_size_in = len;
+
+  if (proxy_conn->response.processed_data_len > 0)
+  {
+    proxy_conn->gzip_state->first_chunk = false;
+  }
+
+  proxy_conn->response.processed_data_len += len;
+  if (proxy_conn->response.processed_data_len == proxy_conn->response.expected_data_len)
+  {
+    proxy_conn->gzip_state->last_chunk = true;
+  }
+
+  gzip_compress(proxy_conn->gzip_state);
+  gzip_chunk_compress(proxy_conn->gzip_state);
 }
 
 void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
@@ -98,16 +123,45 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
   if (nread >= 0)
   {
-    char *resp = malloc(nread + 1);
-    memcpy(resp, buf->base, nread);
-    resp[nread] = '\0';
+    char *resp = buf->base;
+    ssize_t resp_size = nread;
 
     if (conn->request->enable_compression)
     {
       // enable gzip?
+      if (proxy_conn->gzip_state == NULL)
+      {
+        http_parser_execute(&proxy_conn->response.parser,
+                                        &resp_parser_settings, resp, nread);
+        if (proxy_conn->response.enable_compression)
+        {
+          // Parse status line
+          int status_line_len = strchr(resp, '\r') - resp;
+          memcpy(proxy_conn->response.status_line, resp, status_line_len);
+
+          proxy_conn->gzip_state = malloc(sizeof *proxy_conn->gzip_state);
+          gzip_init_state(proxy_conn->gzip_state);
+          gzip_init_headers(proxy_conn->gzip_state, &proxy_conn->response);
+
+          compress_data(proxy_conn, proxy_conn->response.raw_body,
+                        proxy_conn->response.body_size);
+          resp = proxy_conn->gzip_state->chunk_body;
+          resp_size = proxy_conn->gzip_state->current_size_out;
+        }
+        else
+        {
+          conn->request->enable_compression = false;
+        }
+      }
+      else // Gzip initialized
+      {
+        compress_data(proxy_conn, resp, nread);
+        resp = proxy_conn->gzip_state->chunk_body;
+        resp_size = proxy_conn->gzip_state->current_size_out;
+      }
     }
 
-    write_buf(conn->handle, resp, nread);
+    write_buf(conn->handle, resp, resp_size);
   }
   else
   {
@@ -134,8 +188,12 @@ void proxy_connect_cb(uv_connect_t *req, int status)
     proxy_conn->conn->proxy_handle = req->handle;
   }
 
+  http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
+  proxy_conn->response.parser.data = &proxy_conn->response;
+
   uv_read_start(req->handle, alloc_cb, proxy_read_cb);
-  write_buf(req->handle, proxy_conn->conn->request->raw, strlen(proxy_conn->conn->request->raw));
+  write_buf(req->handle, proxy_conn->conn->request->raw,
+            strlen(proxy_conn->conn->request->raw));
 }
 
 void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
@@ -146,6 +204,8 @@ void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
   proxy_t *proxy_conn = malloc(sizeof(proxy_t));
   proxy_conn->conn = conn;
   proxy_conn->tcp.data = proxy_conn;
+  proxy_conn->gzip_state = NULL;
+  proxy_conn->response.processed_data_len = 0;
 
   if (conn->request->upgrade)
   {
@@ -154,7 +214,8 @@ void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
 
   uv_tcp_init(server->loop, &proxy_conn->tcp);
   uv_tcp_keepalive(&proxy_conn->tcp, 1, 60);
-  uv_tcp_connect(&proxy_conn->connect_req, &proxy_conn->tcp, (const struct sockaddr *)&dest, proxy_connect_cb);
+  uv_tcp_connect(&proxy_conn->connect_req, &proxy_conn->tcp,
+                 (const struct sockaddr *)&dest, proxy_connect_cb);
 }
 
 void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
@@ -169,7 +230,8 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       memcpy(conn->request->raw, buf->base, nread);
       conn->request->raw[nread] = '\0';
 
-      size_t np = http_parser_execute(conn->parser, &parser_settings, buf->base, nread);
+      size_t np = http_parser_execute(conn->parser, &parser_settings, buf->base,
+                                      nread);
       if (np != nread)
       {
         uv_shutdown_t *req;
@@ -251,7 +313,8 @@ void connection_cb(uv_stream_t *s, int status)
 
 proxy_ip_port find_proxy_config(char *hostname)
 {
-  proxy_ip_port ip_port = {.ip = NULL, .port = 0};
+  proxy_ip_port ip_port =
+      {.ip = NULL, .port = 0};
 
   for (int i = 0; i < server->config->num_proxies; i++)
   {
@@ -368,6 +431,9 @@ void usage()
 
 int main(int argc, char **argv)
 {
+  //test();
+  //return 0;
+
   server = malloc(sizeof(server_t));
   server->config = malloc(sizeof(config_t));
   parse_args(argc, argv);
