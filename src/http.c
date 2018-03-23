@@ -89,8 +89,10 @@ int headers_complete_cb(http_parser *p)
 
 int body_cb(http_parser *p, const char *buf, size_t length)
 {
-  p->data = malloc(length + 1);
-  strncpy(p->data, buf, length);
+  http_response_t *response = p->data;
+  response->raw_body = malloc(length);
+  strncpy(response->raw_body, buf, length);
+  response->body_size = length;
 
   return 0;
 }
@@ -190,4 +192,70 @@ void http_404_response(char *resp)
            "</body>\r\n"
            "</html>\r\n",
            VERSION, VERSION);
+}
+
+int response_message_begin_cb(http_parser *p)
+{
+  http_response_t *response = p->data;
+  for (int i = 0; i < MAX_HEADERS; i++)
+  {
+    response->headers[i][0][0] = 0;
+    response->headers[i][1][0] = 0;
+  }
+  response->num_headers = 0;
+  response->last_header_element = NONE;
+  return 0;
+}
+
+int response_headers_field_cb(http_parser *p, const char *buf, size_t len)
+{
+  http_response_t *response = p->data;
+  if (response->last_header_element != FIELD)
+  {
+    response->num_headers++;
+  }
+  strncat(response->headers[response->num_headers - 1][0], buf, len);
+  response->last_header_element = FIELD;
+  return 0;
+}
+
+int response_headers_value_cb(http_parser *p, const char *buf, size_t len)
+{
+  http_response_t *response = p->data;
+  strncat(response->headers[response->num_headers - 1][1], buf, len);
+  response->last_header_element = VALUE;
+  return 0;
+}
+
+int response_headers_complete_cb(http_parser *p)
+{
+  http_response_t *response = p->data;
+  response->enable_compression = false;
+  boolean already_compressed = false;
+
+  for (int i = 0; i < response->num_headers; i++)
+  {
+    if (strcasecmp(response->headers[i][0], "Content-Type") == 0)
+    {
+      // TODO: allow multiple types
+      if (strstr(response->headers[i][1], "text/") != NULL)
+      {
+        response->enable_compression = true;
+      }
+    }
+    else if (strcasecmp(response->headers[i][0], "Content-Encoding") == 0)
+    {
+      already_compressed = true;
+    }
+    else if (strcasecmp(response->headers[i][0], "Content-Length") == 0)
+    {
+      response->expected_data_len = atoi(response->headers[i][1]);
+    }
+  }
+
+  if (already_compressed)
+  {
+    response->enable_compression = false;
+  }
+  return 0;
 }

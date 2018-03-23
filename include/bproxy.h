@@ -19,6 +19,7 @@
 #include "http.h"
 #include "config.h"
 #include "version.h"
+#include "gzip.h"
 
 typedef struct
 {
@@ -45,6 +46,8 @@ typedef struct proxy_t
   uv_connect_t connect_req;
   uv_shutdown_t shutdown_req;
   uv_write_t write_req;
+  gzip_state_t *gzip_state;
+  http_response_t response;
 } proxy_t;
 
 typedef struct proxy_ip_port

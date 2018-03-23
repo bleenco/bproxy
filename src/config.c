@@ -143,5 +143,9 @@ void parse_config(const char *json_string, config_t *config)
       free(proxy_str);
       return;
     }
+    else if (jsoneq(json_string, &t[i], "gzip-types") == 0)
+    {
+      printf("yeey");
+    }
   }
 }
