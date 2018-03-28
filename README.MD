@@ -1,6 +1,6 @@
 ## bproxy
 
-bproxy is lightweight super-fast minimal configuration proxy server written in C based on `libuv`.
+bproxy is lightweight super-fast minimal configuration proxy server written in C based on `libuv` that supports gzip natively.
 
 ### Building project
 
