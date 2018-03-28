@@ -1,8 +1,18 @@
-TARGET = build/bproxy
+include target.mk
+TARGET = build/bproxy_$(PLATFORM)_$(ARCH)
 CC = clang
 CFLAGS = -Wall -Iinclude -O3
 DEPS = build/obj/jsmn.o build/obj/http_parser.o build/obj/http.o build/obj/config.o build/obj/gzip.o
 LIBS = -luv -lpthread -ldl -lz
+
+ifeq ($(PLATFORM),linux)
+	ifeq ($(ARCH),amd64)
+		STATIC_LIBS = /usr/lib/x86_64-linux-gnu/libuv.a /usr/lib/x86_64-linux-gnu/libz.a
+	endif
+	ifeq ($(ARCH),arm)
+		STATIC_LIBS = /usr/lib/arm-linux-gnueabihf/libuv.a /usr/lib/arm-linux-gnueabihf/libz.a
+	endif
+endif
 
 .PHONY: all bproxy checkdir clean
 
@@ -11,13 +21,13 @@ static: checkdir bproxy_static
 recompile: clean checkdir bproxy
 
 install:
-	cp build/bproxy /usr/local/bin/bproxy
+	cp build/$(TARGET) /usr/local/bin/bproxy
 
 bproxy: jsmn.o http_parser.o http.o config.o gzip.o
 	$(CC) $(CFLAGS) $(DEPS) -o $(TARGET) src/bproxy.c $(LIBS)
 
 bproxy_static: jsmn.o http_parser.o http.o config.o gzip.o
-	$(CC) -Wall -Iinclude -O3 -static -pthread -ldl $(DEPS) -o $(TARGET) src/bproxy.c /usr/lib/x86_64-linux-gnu/libuv.a
+	$(CC) -Wall -Iinclude -O3 -static -pthread -ldl $(DEPS) -o $(TARGET) src/bproxy.c $(STATIC_LIBS)
 
 http_parser.o: checkdir
 	$(CC) $(CFLAGS) -c src/http_parser.c -o build/obj/http_parser.o
@@ -39,3 +49,6 @@ checkdir:
 
 clean:
 	@rm -rf build/
+
+docker_image:
+	docker build -t bproxy .
