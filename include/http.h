@@ -73,6 +73,11 @@ typedef struct conn_t
   uv_stream_t *handle;
   boolean ws_handshake_sent;
   uv_stream_t *proxy_handle;
+  enum
+  {
+    TYPE_REQUEST,
+    TYPE_WEBSOCKET
+  } type;
 } conn_t;
 
 int message_begin_cb(http_parser *p);

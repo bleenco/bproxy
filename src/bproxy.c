@@ -20,6 +20,7 @@ void conn_init(uv_stream_t *handle)
   http_parser_init(conn->parser, HTTP_REQUEST);
   conn->parser->data = conn;
   conn->ws_handshake_sent = false;
+  conn->type = TYPE_REQUEST;
 }
 
 void conn_free(uv_handle_t *handle)
@@ -170,9 +171,10 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       log_error("could not read from socket!");
     }
-    if (uv_is_closing((const uv_handle_t *)handle))
+    if (!uv_is_closing((const uv_handle_t *)handle))
     {
       uv_close((uv_handle_t *)handle, proxy_close_cb);
+      conn->proxy_handle = NULL;
     }
   }
 
@@ -184,10 +186,14 @@ void proxy_connect_cb(uv_connect_t *req, int status)
   proxy_t *proxy_conn = req->handle->data;
   proxy_conn->connect_req = *req;
 
-  if (proxy_conn->conn->ws_handshake_sent)
+  if (status < 0)
   {
-    proxy_conn->conn->proxy_handle = req->handle;
+    uv_close((uv_handle_t *)proxy_conn->conn->handle, close_cb);
+    // TODO: write meaningful responses
+    return;
   }
+
+  proxy_conn->conn->proxy_handle = req->handle;
 
   http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
   proxy_conn->response.parser.data = &proxy_conn->response;
@@ -207,10 +213,10 @@ void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
   proxy_conn->tcp.data = proxy_conn;
   proxy_conn->gzip_state = NULL;
   proxy_conn->response.processed_data_len = 0;
-
   if (conn->request->upgrade)
   {
     conn->ws_handshake_sent = true;
+    conn->type = TYPE_WEBSOCKET;
   }
 
   uv_tcp_init(server->loop, &proxy_conn->tcp);
@@ -225,7 +231,11 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
   if (nread >= 0)
   {
-    if (!conn->ws_handshake_sent)
+    if (conn->proxy_handle != NULL)
+    {
+      write_buf(conn->proxy_handle, buf->base, nread);
+    }
+    else
     {
       conn->request->raw = malloc(nread + 1);
       memcpy(conn->request->raw, buf->base, nread);
@@ -261,10 +271,6 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
       proxy_http_request(ip_port.ip, ip_port.port, conn);
     }
-    else if (conn->proxy_handle)
-    {
-      write_buf(conn->proxy_handle, buf->base, nread);
-    }
   }
   else
   {
@@ -272,8 +278,13 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       log_error("could not read from socket!");
     }
-    if (uv_is_closing((const uv_handle_t *)handle))
+    if (!uv_is_closing((const uv_handle_t *)handle))
     {
+      if (conn->proxy_handle && !uv_is_closing((uv_handle_t *)conn->proxy_handle))
+      {
+        uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
+        conn->proxy_handle = NULL;
+      }
       uv_close((uv_handle_t *)handle, close_cb);
     }
   }
