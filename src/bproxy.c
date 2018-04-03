@@ -128,7 +128,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     char *resp = buf->base;
     ssize_t resp_size = nread;
 
-    if (conn->request->enable_compression)
+    if (conn->request->enable_compression && conn->type == TYPE_REQUEST)
     {
       // enable gzip?
       if (proxy_conn->gzip_state == NULL)
@@ -231,7 +231,7 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
   if (nread >= 0)
   {
-    if (conn->proxy_handle != NULL)
+    if (conn->proxy_handle && conn->type == TYPE_WEBSOCKET)
     {
       write_buf(conn->proxy_handle, buf->base, nread);
     }
@@ -243,6 +243,7 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
       size_t np = http_parser_execute(conn->parser, &parser_settings, buf->base,
                                       nread);
+
       if (np != nread)
       {
         uv_shutdown_t *req;
@@ -250,14 +251,16 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         uv_shutdown(req, handle, shutdown_cb);
       }
 
-      proxy_ip_port ip_port = find_proxy_config(conn->request->hostname);
-      if (!ip_port.ip || !ip_port.port)
+      if(conn->proxy_handle)
       {
-        char *resp = malloc(1024 * sizeof(char));
-        http_404_response(resp);
-        write_buf(conn->handle, resp, strlen(resp));
-        free(resp);
-        return;
+        gzip_state_t *state = ((proxy_t *)conn->proxy_handle->data)->gzip_state;
+        if(state)
+        {
+          gzip_free_state(state);
+          free(state);
+          ((proxy_t *)conn->proxy_handle->data)->gzip_state = NULL;
+        }
+        write_buf(conn->proxy_handle, conn->request->raw, nread);
       }
 
       if (!conn->parser->upgrade)
@@ -269,7 +272,19 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         log_debug("[websocket]: %s", conn->request->url);
       }
 
-      proxy_http_request(ip_port.ip, ip_port.port, conn);
+       if(conn->proxy_handle == NULL)
+      {
+        proxy_ip_port ip_port = find_proxy_config(conn->request->hostname);
+        if (!ip_port.ip || !ip_port.port)
+        {
+          char *resp = malloc(1024 * sizeof(char));
+          http_404_response(resp);
+          write_buf(conn->handle, resp, strlen(resp));
+          free(resp);
+          return;
+        }
+        proxy_http_request(ip_port.ip, ip_port.port, conn);
+      }
     }
   }
   else
