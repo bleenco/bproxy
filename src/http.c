@@ -204,6 +204,8 @@ int response_message_begin_cb(http_parser *p)
   }
   response->num_headers = 0;
   response->last_header_element = NONE;
+  response->expected_data_len = 0;
+  response->processed_data_len = 0;
   return 0;
 }
 
