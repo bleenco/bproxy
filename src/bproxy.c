@@ -7,6 +7,7 @@
  */
 #include "bproxy.h"
 #include "gzip.h"
+#include "log.h"
 
 void conn_init(uv_stream_t *handle)
 {
@@ -58,7 +59,7 @@ void write_buf(uv_stream_t *handle, char *data, int len)
   wr->buf = uv_buf_init((char *)data, len);
   if (uv_is_writable((const uv_stream_t *)handle) && !uv_is_closing((const uv_handle_t *)handle) && uv_write(&wr->req, handle, &wr->buf, 1, write_cb))
   {
-    fprintf(stderr, "write error: could not write to destination!\n");
+    log_error("could not write to destination!");
     return;
   }
 }
@@ -67,7 +68,7 @@ void write_cb(uv_write_t *req, int status)
 {
   if (status < 0)
   {
-    fprintf(stderr, "write error: error writing to destination!\n");
+    log_error("error writting to destination!");
     return;
   }
 }
@@ -88,7 +89,7 @@ void proxy_close_cb(uv_handle_t *peer)
   proxy_t *proxy_conn = peer->data;
   if (proxy_conn)
   {
-    if(proxy_conn->gzip_state)
+    if (proxy_conn->gzip_state)
     {
       gzip_free_state(proxy_conn->gzip_state);
     }
@@ -98,7 +99,7 @@ void proxy_close_cb(uv_handle_t *peer)
 
 void compress_data(proxy_t *proxy_conn, char *data, int len)
 {
-  proxy_conn->gzip_state->raw_body = (unsigned char*) data;
+  proxy_conn->gzip_state->raw_body = (unsigned char *)data;
   proxy_conn->gzip_state->current_size_in = len;
 
   if (proxy_conn->response.processed_data_len > 0)
@@ -132,7 +133,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       if (proxy_conn->gzip_state == NULL)
       {
         http_parser_execute(&proxy_conn->response.parser,
-                                        &resp_parser_settings, resp, nread);
+                            &resp_parser_settings, resp, nread);
         if (proxy_conn->response.enable_compression)
         {
           // Parse status line
@@ -167,7 +168,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   {
     if (nread != UV_EOF)
     {
-      fprintf(stderr, "error reading from socket!\n");
+      log_error("could not read from socket!");
     }
     if (uv_is_closing((const uv_handle_t *)handle))
     {
@@ -251,11 +252,11 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
       if (!conn->parser->upgrade)
       {
-        fprintf(stderr, "[http]: %s\n", conn->request->url);
+        log_debug("[http]: %s", conn->request->url);
       }
       else
       {
-        fprintf(stderr, "[ws]: %s\n", conn->request->url);
+        log_debug("[websocket]: %s", conn->request->url);
       }
 
       proxy_http_request(ip_port.ip, ip_port.port, conn);
@@ -269,7 +270,7 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   {
     if (nread != UV_EOF)
     {
-      fprintf(stderr, "error reading from socket!\n");
+      log_error("could not read from socket!");
     }
     if (uv_is_closing((const uv_handle_t *)handle))
     {
@@ -284,7 +285,7 @@ void connection_cb(uv_stream_t *s, int status)
 {
   if (status < 0)
   {
-    fprintf(stderr, "connection error: %s", uv_err_name(status));
+    log_error("connection error: %s", uv_err_name(status));
     return;
   }
 
@@ -293,28 +294,27 @@ void connection_cb(uv_stream_t *s, int status)
 
   if (uv_tcp_init(server->loop, (uv_tcp_t *)conn))
   {
-    fprintf(stderr, "cannot init tcp connection!\n");
+    log_error("cannot init tcp connection!");
     return;
   }
 
   if (uv_accept(s, conn))
   {
-    fprintf(stderr, "cannot accept tcp connection!\n");
+    log_error("cannot accept tcp connection!");
     return;
   }
 
   conn_init(conn);
   if (uv_read_start(conn, alloc_cb, read_cb))
   {
-    fprintf(stderr, "cannot read from remote connection!\n");
+    log_error("cannot read from remote connection!");
     return;
   }
 }
 
 proxy_ip_port find_proxy_config(char *hostname)
 {
-  proxy_ip_port ip_port =
-      {.ip = NULL, .port = 0};
+  proxy_ip_port ip_port = {.ip = NULL, .port = 0};
 
   for (int i = 0; i < server->config->num_proxies; i++)
   {
@@ -360,21 +360,21 @@ int server_init()
 
   if (uv_tcp_init(server->loop, &server->tcp))
   {
-    fprintf(stderr, "cannot initialize tcp connection.\n");
+    log_error("cannot init tcp connection!");
     return 1;
   }
   uv_ip4_addr("0.0.0.0", server->config->port, &server->address);
   if (uv_tcp_bind(&server->tcp, (const struct sockaddr *)&server->address, 0))
   {
-    fprintf(stderr, "cannot bind server.\n");
+    log_error("cannot bind server! check your permissions and another service running on same port.");
     return 1;
   }
   if (uv_listen((uv_stream_t *)&server->tcp, 4096, connection_cb))
   {
-    fprintf(stderr, "server listen error.\n");
+    log_error("server listen error!");
     return 1;
   }
-  fprintf(stderr, "=> bproxy listening on 0.0.0.0:%d\n", server->config->port);
+  log_info("listening on 0.0.0.0:%d", server->config->port);
 
   return 0;
 }
@@ -431,9 +431,6 @@ void usage()
 
 int main(int argc, char **argv)
 {
-  //test();
-  //return 0;
-
   server = malloc(sizeof(server_t));
   server->config = malloc(sizeof(config_t));
   parse_args(argc, argv);
