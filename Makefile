@@ -2,7 +2,7 @@ include target.mk
 TARGET = build/bproxy_$(PLATFORM)_$(ARCH)
 CC = clang
 CFLAGS = -Wall -Iinclude -O3
-DEPS = build/obj/jsmn.o build/obj/http_parser.o build/obj/http.o build/obj/config.o build/obj/gzip.o
+DEPS = build/obj/jsmn.o build/obj/http_parser.o build/obj/http.o build/obj/config.o build/obj/gzip.o build/obj/log.o
 LIBS = -luv -lpthread -ldl -lz
 
 ifeq ($(PLATFORM),linux)
@@ -23,10 +23,10 @@ recompile: clean checkdir bproxy
 install:
 	cp build/$(TARGET) /usr/local/bin/bproxy
 
-bproxy: jsmn.o http_parser.o http.o config.o gzip.o
+bproxy: jsmn.o http_parser.o http.o config.o gzip.o log.o
 	$(CC) $(CFLAGS) $(DEPS) -o $(TARGET) src/bproxy.c $(LIBS)
 
-bproxy_static: jsmn.o http_parser.o http.o config.o gzip.o
+bproxy_static: jsmn.o http_parser.o http.o config.o gzip.o log.o
 	$(CC) -Wall -Iinclude -O3 -static -pthread -ldl $(DEPS) -o $(TARGET) src/bproxy.c $(STATIC_LIBS)
 
 http_parser.o: checkdir
@@ -43,6 +43,9 @@ jsmn.o: checkdir
 
 gzip.o: checkdir
 	$(CC) $(CFLAGS) -c src/gzip.c -o build/obj/gzip.o
+
+log.o: checkdir
+	$(CC) $(CFLAGS) -c src/log.c -o build/obj/log.o
 
 checkdir:
 	@mkdir -p build/obj
