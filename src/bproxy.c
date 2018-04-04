@@ -251,10 +251,10 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         uv_shutdown(req, handle, shutdown_cb);
       }
 
-      if(conn->proxy_handle)
+      if (conn->proxy_handle)
       {
         gzip_state_t *state = ((proxy_t *)conn->proxy_handle->data)->gzip_state;
-        if(state)
+        if (state)
         {
           gzip_free_state(state);
           free(state);
@@ -272,7 +272,7 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         log_debug("[websocket]: %s", conn->request->url);
       }
 
-       if(conn->proxy_handle == NULL)
+      if (conn->proxy_handle == NULL)
       {
         proxy_ip_port ip_port = find_proxy_config(conn->request->hostname);
         if (!ip_port.ip || !ip_port.port)
