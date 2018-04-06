@@ -25,6 +25,7 @@ int message_begin_cb(http_parser *p)
 int url_cb(http_parser *p, const char *buf, size_t len)
 {
   conn_t *conn = p->data;
+  free(conn->request->url);
   conn->request->url = malloc((len + 1) * sizeof(char));
   memcpy(conn->request->url, buf, len);
   conn->request->url[len] = '\0';
@@ -70,7 +71,6 @@ int headers_complete_cb(http_parser *p)
     if (strcasecmp(req->headers[i][0], "Host") == 0)
     {
       int nob = strlen(req->headers[i][1]);
-      req->host = malloc((nob + 1) * sizeof(char));
       memcpy(req->host, req->headers[i][1], nob);
       req->host[nob] = '\0';
       parse_requested_host(req);
@@ -90,6 +90,7 @@ int headers_complete_cb(http_parser *p)
 int body_cb(http_parser *p, const char *buf, size_t length)
 {
   http_response_t *response = p->data;
+  free(response->raw_body);
   response->raw_body = malloc(length);
   strncpy(response->raw_body, buf, length);
   response->body_size = length;
@@ -113,14 +114,12 @@ void parse_requested_host(http_request_t *request)
     host[len - (len - index)] = '\0';
     len = strlen(host);
 
-    request->hostname = malloc(len + 1);
     memcpy(request->hostname, host, len);
     request->hostname[len] = '\0';
   }
   else
   {
     int nob = strlen(host);
-    request->hostname = malloc(nob + 1);
     memcpy(request->hostname, host, nob);
     request->hostname[nob] = '\0';
   }

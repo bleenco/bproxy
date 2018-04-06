@@ -34,10 +34,10 @@ typedef struct http_request_t
 {
   char *raw;
   enum http_method method;
-  char *host;
+  char host[256];
   char *url;
   char *body;
-  char *hostname;
+  char hostname[256];
   uint8_t http_major;
   uint8_t http_minor;
   uint8_t keepalive;

@@ -14,6 +14,7 @@ void conn_init(uv_stream_t *handle)
   conn_t *conn = malloc(sizeof(conn_t));
   conn->parser = malloc(sizeof(http_parser));
   conn->request = malloc(sizeof(http_request_t));
+  memset(conn->request, 0, sizeof *conn->request);
   conn->proxy_handle = NULL;
   conn->handle = handle;
   handle->data = conn;
@@ -34,6 +35,8 @@ void conn_free(uv_handle_t *handle)
     }
     if (conn->request)
     {
+      free(conn->request->url);
+      free(conn->request->raw);
       free(conn->request);
     }
     if (conn)
@@ -72,6 +75,7 @@ void write_cb(uv_write_t *req, int status)
     log_error("error writting to destination!");
     return;
   }
+  free(req);
 }
 
 void close_cb(uv_handle_t *peer)
@@ -94,6 +98,7 @@ void proxy_close_cb(uv_handle_t *peer)
     {
       gzip_free_state(proxy_conn->gzip_state);
     }
+    free(proxy_conn->response.raw_body);
     free(proxy_conn);
   }
 }
@@ -209,6 +214,7 @@ void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
   uv_ip4_addr(ip, port, &dest);
 
   proxy_t *proxy_conn = malloc(sizeof(proxy_t));
+  memset(proxy_conn, 0, sizeof *proxy_conn);
   proxy_conn->conn = conn;
   proxy_conn->tcp.data = proxy_conn;
   proxy_conn->gzip_state = NULL;
@@ -237,6 +243,7 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     }
     else
     {
+      free(conn->request->raw);
       conn->request->raw = malloc(nread + 1);
       memcpy(conn->request->raw, buf->base, nread);
       conn->request->raw[nread] = '\0';
