@@ -15,6 +15,8 @@
 #include "jsmn.h"
 
 #define CONFIG_MAX_HOSTS 10
+#define CONFIG_MAX_GZIP_MIME_TYPES 20
+#define CONFIG_MAX_PROXIES 100
 
 typedef struct proxy_config_t
 {
@@ -27,7 +29,9 @@ typedef struct proxy_config_t
 typedef struct config_t
 {
   unsigned short port;
-  proxy_config_t *proxies[100];
+  char *gzip_mime_types[CONFIG_MAX_GZIP_MIME_TYPES];
+  int num_gzip_mime_types;
+  proxy_config_t *proxies[CONFIG_MAX_PROXIES];
   int num_proxies;
 } config_t;
 

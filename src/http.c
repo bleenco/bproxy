@@ -238,10 +238,13 @@ int response_headers_complete_cb(http_parser *p)
   {
     if (strcasecmp(response->headers[i][0], "Content-Type") == 0)
     {
-      // TODO: allow multiple types
-      if (strstr(response->headers[i][1], "text/") != NULL)
+      for (int j = 0; j < response->server_config->num_gzip_mime_types; j++)
       {
-        response->enable_compression = true;
+        if (strstr(response->headers[i][1], response->server_config->gzip_mime_types[j]))
+        {
+          response->enable_compression = true;
+          continue;
+        }
       }
     }
     else if (strcasecmp(response->headers[i][0], "Content-Encoding") == 0)

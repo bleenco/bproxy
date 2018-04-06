@@ -201,6 +201,7 @@ void proxy_connect_cb(uv_connect_t *req, int status)
   proxy_conn->conn->proxy_handle = req->handle;
 
   http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
+  proxy_conn->response.server_config = server->config;
   proxy_conn->response.parser.data = &proxy_conn->response;
 
   uv_read_start(req->handle, alloc_cb, proxy_read_cb);

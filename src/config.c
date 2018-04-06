@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://github.com/bleenco/bproxy
  */
 #include "config.h"
+#include "log.h"
 
 char *read_file(char *path)
 {
@@ -16,7 +17,7 @@ char *read_file(char *path)
 
   if (!f)
   {
-    fprintf(stderr, "could not open file %s for reading!\n", path);
+    log_error("could not open file %s for reading!", path);
     exit(1);
   }
 
@@ -47,14 +48,14 @@ void parse_config(const char *json_string, config_t *config)
   int r = jsmn_parse(&p, json_string, strlen(json_string), t, sizeof(t) / sizeof(t[0]));
   if (r < 0)
   {
-    fprintf(stderr, "failed to parse config JSON: %d\n", r);
+    log_error("failed to parse config JSON: %d", r);
     exit(1);
   }
 
   // assume top-level element is an object
   if (r < 1 || t[0].type != JSMN_OBJECT)
   {
-    fprintf(stderr, "wrong configuration!\n");
+    log_error("wrong JSON configuration!");
     exit(1);
   }
 
@@ -70,11 +71,30 @@ void parse_config(const char *json_string, config_t *config)
       free(port);
       i++;
     }
+    else if (jsoneq(json_string, &t[i], "gzip_mime_types") == 0)
+    {
+      if (t[i + 1].type != JSMN_ARRAY)
+      {
+        log_error("wrong configuration, gzip_mime_types should be an array!");
+        exit(1);
+      }
+
+      config->num_gzip_mime_types = 0;
+      for (int j = 0; j < t[i + 1].size; j++)
+      {
+        jsmntok_t *mime_type = &t[i + j + 2];
+        char *mime = malloc(50);
+        sprintf(mime, "%.*s", mime_type->end - mime_type->start, json_string + mime_type->start);
+        config->gzip_mime_types[config->num_gzip_mime_types] = malloc(sizeof(char) * 50);
+        memcpy(config->gzip_mime_types[config->num_gzip_mime_types], mime, strlen(mime));
+        config->num_gzip_mime_types++;
+      }
+    }
     else if (jsoneq(json_string, &t[i], "proxies") == 0)
     {
       if (t[i + 1].type != JSMN_ARRAY)
       {
-        fprintf(stderr, "wrong configuration, proxies should be array!\n");
+        log_error("wrong configuration, proxies should be an array!");
         exit(1);
       }
 
@@ -88,7 +108,7 @@ void parse_config(const char *json_string, config_t *config)
       int rr = jsmn_parse(&pp, proxy_str, strlen(proxy_str), token, sizeof(token) / sizeof(token[0]));
       if (rr < 0)
       {
-        fprintf(stderr, "failed to parse JSON (proxies): %d\n", rr);
+        log_error("failed to parse JSON (proxies): %d", rr);
         exit(1);
       }
 
@@ -142,10 +162,6 @@ void parse_config(const char *json_string, config_t *config)
 
       free(proxy_str);
       return;
-    }
-    else if (jsoneq(json_string, &t[i], "gzip-types") == 0)
-    {
-      printf("yeey");
     }
   }
 }
