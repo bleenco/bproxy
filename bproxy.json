@@ -1,5 +1,6 @@
 {
   "port": 8080,
+  "gzip_mime_types": ["text/css", "application/javascript", "application/x-javascript"],
   "proxies": [
     {
       "hosts": [

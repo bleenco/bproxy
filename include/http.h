@@ -17,6 +17,7 @@
 #include "uv.h"
 #include "http_parser.h"
 #include "version.h"
+#include "config.h"
 
 #define MAX_HEADERS 20
 #define MAX_ELEMENT_SIZE 500
@@ -63,6 +64,7 @@ typedef struct http_response_t
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
   char status_line[256];
   boolean enable_compression;
+  config_t *server_config;
 } http_response_t;
 
 typedef struct conn_t
