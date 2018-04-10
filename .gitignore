@@ -1,2 +1,5 @@
 build/
+node_modules/
+out/
+gypkg_deps/
 .DS_Store
