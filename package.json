@@ -1,11 +1,12 @@
 {
   "name": "bproxy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "test": "make test",
     "build": "gypkg build bproxy.gyp",
-    "clean": "rimraf gypkg_deps out"
+    "clean": "rimraf gypkg_deps out",
+    "log": "conventional-changelog -p angular -i CHANGELOG.md -s"
   },
   "authors": [
     "Jan Kuri <jan@bleenco.com>",
