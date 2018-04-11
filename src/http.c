@@ -77,7 +77,7 @@ int headers_complete_cb(http_parser *p)
     }
     else if (strcasecmp(req->headers[i][0], "Accept-Encoding") == 0)
     {
-      if (strcasecmp(req->headers[i][1], "gzip, deflate") == 0)
+      if (strstr(req->headers[i][1], "gzip"))
       {
         req->enable_compression = true;
       }

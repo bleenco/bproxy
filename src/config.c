@@ -86,6 +86,7 @@ void parse_config(const char *json_string, config_t *config)
         char *mime = malloc(50);
         sprintf(mime, "%.*s", mime_type->end - mime_type->start, json_string + mime_type->start);
         config->gzip_mime_types[config->num_gzip_mime_types] = malloc(sizeof(char) * 50);
+        memset(config->gzip_mime_types[config->num_gzip_mime_types], 0, 50);
         memcpy(config->gzip_mime_types[config->num_gzip_mime_types], mime, strlen(mime));
         config->num_gzip_mime_types++;
       }
