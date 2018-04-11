@@ -72,7 +72,7 @@ void gzip_chunk_compress(gzip_state_t *state)
 {
   int gz_size = state->current_size_out;
   // Message def: hex size, \r\n, gzip content, \r\n, (if last add) 0 \r\n\r\n
-  char *head_def = "%x\r\n";
+  char *head_def = "%X\r\n";
 
   char head[200];
 

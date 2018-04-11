@@ -27,6 +27,13 @@ void conn_init(uv_stream_t *handle)
 void conn_free(uv_handle_t *handle)
 {
   conn_t *conn = handle->data;
+  if (conn->proxy_handle)
+  {
+    if (!uv_is_closing((uv_handle_t *)conn->proxy_handle))
+    {
+      uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
+    }
+  }
   if (conn)
   {
     if (conn->parser)
@@ -58,6 +65,10 @@ void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 
 void write_buf(uv_stream_t *handle, char *data, int len)
 {
+  if (len == 0)
+  {
+    return;
+  }
   write_req_t *wr;
   wr = (write_req_t *)malloc(sizeof *wr);
   wr->buf = uv_buf_init((char *)data, len);
@@ -128,16 +139,16 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   proxy_t *proxy_conn = handle->data;
   conn_t *conn = proxy_conn->conn;
 
-  if (nread >= 0)
+  if (nread > 0)
   {
     char *resp = buf->base;
     ssize_t resp_size = nread;
-
     if (conn->request->enable_compression && conn->type == TYPE_REQUEST)
     {
       // enable gzip?
       if (proxy_conn->gzip_state == NULL)
       {
+        http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
         http_parser_execute(&proxy_conn->response.parser,
                             &resp_parser_settings, resp, nread);
         if (proxy_conn->response.enable_compression)
@@ -146,14 +157,28 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
           int status_line_len = strchr(resp, '\r') - resp;
           memcpy(proxy_conn->response.status_line, resp, status_line_len);
 
+          // Get body start and body length
+          int headers_len = strstr(resp, "\r\n\r\n") - resp + 4; // 4 is for \r\n\r\n
+          int body_len = nread - headers_len;
+          proxy_conn->response.body_size = body_len;
+
           proxy_conn->gzip_state = malloc(sizeof *proxy_conn->gzip_state);
           gzip_init_state(proxy_conn->gzip_state);
           gzip_init_headers(proxy_conn->gzip_state, &proxy_conn->response);
+          if (body_len == 0)
+          {
+            resp_size = 0;
+          }
+          if (body_len > 0)
+          {
+            proxy_conn->response.raw_body = malloc(body_len);
+            memcpy(proxy_conn->response.raw_body, &resp[headers_len], body_len);
 
-          compress_data(proxy_conn, proxy_conn->response.raw_body,
-                        proxy_conn->response.body_size);
-          resp = proxy_conn->gzip_state->chunk_body;
-          resp_size = proxy_conn->gzip_state->current_size_out;
+            compress_data(proxy_conn, proxy_conn->response.raw_body,
+                          proxy_conn->response.body_size);
+            resp = proxy_conn->gzip_state->chunk_body;
+            resp_size = proxy_conn->gzip_state->current_size_out;
+          }
         }
         else
         {
@@ -170,7 +195,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
     write_buf(conn->handle, resp, resp_size);
   }
-  else
+  else if (nread < 0)
   {
     if (nread != UV_EOF)
     {
@@ -197,7 +222,6 @@ void proxy_connect_cb(uv_connect_t *req, int status)
     // TODO: write meaningful responses
     return;
   }
-
   proxy_conn->conn->proxy_handle = req->handle;
 
   http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
@@ -268,6 +292,7 @@ void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
           free(state);
           ((proxy_t *)conn->proxy_handle->data)->gzip_state = NULL;
         }
+        ((proxy_t *)conn->proxy_handle->data)->response.processed_data_len = 0;
         write_buf(conn->proxy_handle, conn->request->raw, nread);
       }
 
@@ -416,6 +441,7 @@ int server_init()
 void parse_args(int argc, char **argv)
 {
   server->config_file = malloc(256 * sizeof(char));
+  memset(server->config_file, 0, 256);
   strncpy(server->config_file, "bproxy.json", 11);
   int opt;
 
