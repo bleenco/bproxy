@@ -71,7 +71,10 @@ void write_buf(uv_stream_t *handle, char *data, int len)
   }
   write_req_t *wr;
   wr = (write_req_t *)malloc(sizeof *wr);
-  wr->buf = uv_buf_init((char *)data, len);
+  char *d = malloc(len);
+  memcpy(d, data, len);
+  wr->buf = uv_buf_init((char *)d, len);
+  wr->req.data = wr;
   if (uv_is_writable((const uv_stream_t *)handle) && !uv_is_closing((const uv_handle_t *)handle) && uv_write(&wr->req, handle, &wr->buf, 1, write_cb))
   {
     log_error("could not write to destination!");
@@ -86,7 +89,9 @@ void write_cb(uv_write_t *req, int status)
     log_error("error writting to destination!");
     return;
   }
-  free(req);
+  write_req_t *wr = (write_req_t *)req->data;
+  free(wr->buf.base);
+  free(wr);
 }
 
 void close_cb(uv_handle_t *peer)
