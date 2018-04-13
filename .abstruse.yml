@@ -1,7 +1,10 @@
 image: bproxy
 
 matrix:
-  - env: COMMAND=make
+  - env: COMMAND=test
+
+install:
+  - npm install
 
 script:
-  - if [[ "$COMMAND" ]]; then $COMMAND; fi
+  - if [[ "$COMMAND" ]]; then npm run $COMMAND; fi
