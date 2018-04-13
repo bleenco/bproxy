@@ -175,7 +175,7 @@ void http_404_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 404 Not Found\r\n"
-           "Content-Length: 160\r\n"
+           "Content-Length: 161\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "Server: vex/%s\r\n"
