@@ -2,6 +2,7 @@
   "variables": {
     "gypkg_deps": [
       "git://github.com/libuv/libuv.git@^v1.x => uv.gyp:libuv",
+      "git://github.com/indutny/uv_link_t@v1.0.5 => uv_link_t.gyp:uv_link_t",
       "3rdparty/zlib => gyp/zlib.gyp:zlib"
     ]
   },
