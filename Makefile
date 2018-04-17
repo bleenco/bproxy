@@ -14,7 +14,8 @@ ifeq ($(PLATFORM),linux)
 	endif
 endif
 
-.PHONY: all bproxy checkdir clean
+dist:
+	npm run build
 
 all: checkdir bproxy
 static: checkdir bproxy_static
@@ -55,3 +56,5 @@ clean:
 
 docker_image:
 	docker build -t bproxy .
+
+.PHONY: all bproxy checkdir clean dist
