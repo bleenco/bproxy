@@ -59,7 +59,7 @@ typedef struct proxy_ip_port
 server_t *server;
 
 static void conn_init(uv_stream_t *handle);
-static void conn_free(uv_handle_t *handle);
+static void conn_free(conn_t* conn);
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
 static void write_buf(uv_stream_t *handle, char *data, int len);
@@ -70,14 +70,18 @@ void proxy_connect_cb(uv_connect_t *req, int status);
 void proxy_http_request(char *ip, unsigned short port, conn_t *conn);
 
 static void write_cb(uv_write_t *req, int status);
-static void close_cb(uv_handle_t *peer);
+//static void close_cb(uv_handle_t *peer);
+void link_close_cb(uv_link_t* source);
 static void shutdown_cb(uv_shutdown_t *req, int status);
-static void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
+//static void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
 static void connection_cb(uv_stream_t *s, int status);
 
 static proxy_ip_port find_proxy_config(char *hostname);
 static int server_init();
 void parse_args(int argc, char **argv);
 void usage();
+
+uv_link_methods_t middle_methods;
+
 
 #endif // _BPROXY_BPROXY_H_
