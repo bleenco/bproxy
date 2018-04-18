@@ -9,6 +9,24 @@
 #include "gzip.h"
 #include "log.h"
 
+#include <assert.h>
+
+#define CHECK(V) if ((V) != 0) abort()
+#define CHECK_ALLOC(V) if ((V) == NULL) abort()
+
+static void alloc_cb_override(uv_link_t* link,
+                              size_t suggested_size,
+                              uv_buf_t* buf) {
+  buf->base = malloc(suggested_size);
+  assert(buf->base != NULL);
+  buf->len = suggested_size;
+}
+
+static void write_link_cb(uv_link_t* source, int status, void* arg)
+{
+  free(arg);
+}
+
 void conn_init(uv_stream_t *handle)
 {
   conn_t *conn = malloc(sizeof(conn_t));
@@ -22,11 +40,21 @@ void conn_init(uv_stream_t *handle)
   conn->parser->data = conn;
   conn->ws_handshake_sent = false;
   conn->type = TYPE_REQUEST;
+
+  CHECK(uv_link_source_init(&conn->source, (uv_stream_t*) conn->handle));
+  CHECK(uv_link_init(&conn->middle, &middle_methods));
+  //CHECK(uv_link_observer_init(&conn->observer));
+  conn->middle.data = conn;
+  CHECK(uv_link_chain((uv_link_t*)&conn->source, &conn->middle));
+  //CHECK(uv_link_chain((uv_link_t*)&conn->middle, (uv_link_t*)&conn->observer));
+
+  //conn->observer.observer_read_cb = fsh_connection_read_cb;
+  //conn->observer.data = conn;
+  CHECK(uv_link_read_start((uv_link_t*) &conn->middle));
 }
 
-void conn_free(uv_handle_t *handle)
+void conn_free(conn_t *conn)
 {
-  conn_t *conn = handle->data;
   if (conn->proxy_handle)
   {
     if (!uv_is_closing((uv_handle_t *)conn->proxy_handle))
@@ -52,10 +80,7 @@ void conn_free(uv_handle_t *handle)
     }
   }
 
-  if (handle)
-  {
-    free(handle);
-  }
+  //free(conn->handle);
 }
 
 void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
@@ -96,7 +121,12 @@ void write_cb(uv_write_t *req, int status)
 
 void close_cb(uv_handle_t *peer)
 {
-  conn_free(peer);
+  conn_free((conn_t*)peer->data);
+}
+
+void link_close_cb(uv_link_t* source)
+{
+  conn_free((conn_t *)source->data);
 }
 
 void shutdown_cb(uv_shutdown_t *req, int status)
@@ -198,7 +228,11 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       }
     }
 
-    write_buf(conn->handle, resp, resp_size);
+    char* tmp_shit = malloc(resp_size);
+    memcpy(tmp_shit, resp, resp_size);
+    uv_buf_t tmp_buf = uv_buf_init(tmp_shit, resp_size);
+    uv_link_write(&conn->middle, &tmp_buf, 1, NULL, write_link_cb, tmp_buf.base);
+    //write_buf(conn->handle, resp, resp_size);
   }
   else if (nread < 0)
   {
@@ -261,88 +295,91 @@ void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
                  (const struct sockaddr *)&dest, proxy_connect_cb);
 }
 
-void read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
-{
-  conn_t *conn = handle->data;
 
-  if (nread >= 0)
-  {
-    if (conn->proxy_handle && conn->type == TYPE_WEBSOCKET)
+static void read_cb_override(uv_link_t* link, ssize_t nread, const uv_buf_t* buf) {
+  conn_t *conn = link->data;
+
+    if (nread >= 0)
     {
-      write_buf(conn->proxy_handle, buf->base, nread);
-    }
-    else
-    {
-      free(conn->request->raw);
-      conn->request->raw = malloc(nread + 1);
-      memcpy(conn->request->raw, buf->base, nread);
-      conn->request->raw[nread] = '\0';
-
-      size_t np = http_parser_execute(conn->parser, &parser_settings, buf->base,
-                                      nread);
-
-      if (np != nread)
+      if (conn->proxy_handle && conn->type == TYPE_WEBSOCKET)
       {
-        uv_shutdown_t *req;
-        req = (uv_shutdown_t *)malloc(sizeof *req);
-        uv_shutdown(req, handle, shutdown_cb);
-      }
-
-      if (conn->proxy_handle)
-      {
-        gzip_state_t *state = ((proxy_t *)conn->proxy_handle->data)->gzip_state;
-        if (state)
-        {
-          gzip_free_state(state);
-          free(state);
-          ((proxy_t *)conn->proxy_handle->data)->gzip_state = NULL;
-        }
-        ((proxy_t *)conn->proxy_handle->data)->response.processed_data_len = 0;
-        write_buf(conn->proxy_handle, conn->request->raw, nread);
-      }
-
-      if (!conn->parser->upgrade)
-      {
-        log_debug("[http]: %s", conn->request->url);
+        write_buf(conn->proxy_handle, buf->base, nread);
       }
       else
       {
-        log_debug("[websocket]: %s", conn->request->url);
-      }
+        free(conn->request->raw);
+        conn->request->raw = malloc(nread + 1);
+        memcpy(conn->request->raw, buf->base, nread);
+        conn->request->raw[nread] = '\0';
 
-      if (conn->proxy_handle == NULL)
-      {
-        proxy_ip_port ip_port = find_proxy_config(conn->request->hostname);
-        if (!ip_port.ip || !ip_port.port)
+        size_t np = http_parser_execute(conn->parser, &parser_settings, buf->base,
+                                        nread);
+
+        if (np != nread)
         {
-          char *resp = malloc(1024 * sizeof(char));
-          http_404_response(resp);
-          write_buf(conn->handle, resp, strlen(resp));
-          free(resp);
-          return;
+          uv_shutdown_t *req;
+          req = (uv_shutdown_t *)malloc(sizeof *req);
+          //uv_shutdown(req, handle, shutdown_cb);
         }
-        proxy_http_request(ip_port.ip, ip_port.port, conn);
-      }
-    }
-  }
-  else
-  {
-    if (nread != UV_EOF)
-    {
-      log_error("could not read from socket!");
-    }
-    if (!uv_is_closing((const uv_handle_t *)handle))
-    {
-      if (conn->proxy_handle && !uv_is_closing((uv_handle_t *)conn->proxy_handle))
-      {
-        uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
-        conn->proxy_handle = NULL;
-      }
-      uv_close((uv_handle_t *)handle, close_cb);
-    }
-  }
 
-  free(buf->base);
+        if (conn->proxy_handle)
+        {
+          gzip_state_t *state = ((proxy_t *)conn->proxy_handle->data)->gzip_state;
+          if (state)
+          {
+            gzip_free_state(state);
+            free(state);
+            ((proxy_t *)conn->proxy_handle->data)->gzip_state = NULL;
+          }
+          ((proxy_t *)conn->proxy_handle->data)->response.processed_data_len = 0;
+          write_buf(conn->proxy_handle, conn->request->raw, nread);
+        }
+
+        if (!conn->parser->upgrade)
+        {
+          log_debug("[http]: %s", conn->request->url);
+        }
+        else
+        {
+          log_debug("[websocket]: %s", conn->request->url);
+        }
+
+        if (conn->proxy_handle == NULL)
+        {
+          proxy_ip_port ip_port = find_proxy_config(conn->request->hostname);
+          if (!ip_port.ip || !ip_port.port)
+          {
+            char *resp = malloc(1024 * sizeof(char));
+            http_404_response(resp);
+            //write_buf(conn->handle, resp, strlen(resp));
+            uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
+            uv_link_write(link, &tmp_buf, 1, NULL, write_link_cb, tmp_buf.base);
+            free(resp);
+            return;
+          }
+          proxy_http_request(ip_port.ip, ip_port.port, conn);
+        }
+      }
+    }
+    else
+    {
+      if (nread != UV_EOF)
+      {
+        log_error("could not read from socket!");
+      }
+      //if (!uv_is_closing((const uv_handle_t *)handle))
+      {
+        if (conn->proxy_handle && !uv_is_closing((uv_handle_t *)conn->proxy_handle))
+        {
+          uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
+          conn->proxy_handle = NULL;
+        }
+        //uv_close((uv_handle_t *)handle, close_cb);
+        uv_link_close(&conn->middle, link_close_cb);
+      }
+    }
+
+    free(buf->base);
 }
 
 void connection_cb(uv_stream_t *s, int status)
@@ -369,11 +406,11 @@ void connection_cb(uv_stream_t *s, int status)
   }
 
   conn_init(conn);
-  if (uv_read_start(conn, alloc_cb, read_cb))
+  /*if (uv_read_start(conn, alloc_cb, read_cb))
   {
     log_error("cannot read from remote connection!");
     return;
-  }
+  }*/
 }
 
 proxy_ip_port find_proxy_config(char *hostname)
@@ -507,3 +544,15 @@ int main(int argc, char **argv)
   uv_run(server->loop, UV_RUN_DEFAULT);
   return 0;
 }
+
+
+uv_link_methods_t middle_methods = {
+  .read_start = uv_link_default_read_start,
+  .read_stop = uv_link_default_read_stop,
+  .close = link_close_cb,
+  .write = uv_link_default_write,
+
+  /* Other doesn't matter in this example */
+  .alloc_cb_override = alloc_cb_override,
+  .read_cb_override = read_cb_override
+};

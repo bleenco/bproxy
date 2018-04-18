@@ -19,6 +19,8 @@
 #include "version.h"
 #include "config.h"
 
+#include "uv_link_t.h"
+
 #define MAX_HEADERS 20
 #define MAX_ELEMENT_SIZE 500
 
@@ -80,6 +82,9 @@ typedef struct conn_t
     TYPE_REQUEST,
     TYPE_WEBSOCKET
   } type;
+
+  uv_link_source_t source;
+  uv_link_t middle;
 } conn_t;
 
 int message_begin_cb(http_parser *p);
