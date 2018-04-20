@@ -25,6 +25,7 @@
       "src/http_parser.c",
       "src/http.c",
       "src/jsmn.c",
+      "src/http_link.c",
       "src/bproxy.c"
     ]
   }]
