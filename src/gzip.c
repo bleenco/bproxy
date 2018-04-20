@@ -39,12 +39,15 @@ int gzip_init_state(gzip_state_t *state)
   return ret_status;
 }
 
-
 void gzip_free_state(gzip_state_t *state)
 {
-  free(state->gzip_body);
-  free(state->chunk_body);
-  free(state->http_header);
+  if (state)
+  {
+    deflateEnd(&state->strm);
+    free(state->gzip_body);
+    free(state->chunk_body);
+    free(state->http_header);
+  }
 }
 
 int gzip_compress(gzip_state_t *state)
@@ -113,28 +116,3 @@ void gzip_chunk_compress(gzip_state_t *state)
 
   state->current_size_out = offset;
 }
-
-void gzip_init_headers(gzip_state_t *state, http_response_t *response)
-{
-  strcat(state->http_header, response->status_line);
-  strcat(state->http_header, "\r\n");
-  for (int i = 0; i < response->num_headers; ++i)
-  {
-    // Skip responses of non compressed headers
-    if (strcasecmp(response->headers[i][0], "Content-Length") == 0 || strcasecmp(response->headers[i][0], "Accept-Ranges") == 0)
-    {
-      continue;
-    }
-
-    strcat(state->http_header, response->headers[i][0]);
-    strcat(state->http_header, ": ");
-    strcat(state->http_header, response->headers[i][1]);
-    strcat(state->http_header, "\r\n");
-  }
-  // Add gzip headers
-  strcat(state->http_header, "Transfer-Encoding: chunked\r\n");
-  strcat(state->http_header, "Content-Encoding: gzip\r\n");
-
-  strcat(state->http_header, "\r\n");
-}
-

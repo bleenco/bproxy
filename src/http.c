@@ -9,55 +9,52 @@
 
 int message_begin_cb(http_parser *p)
 {
-  conn_t *conn = p->data;
+  http_request_t *request = p->data;
   for (int i = 0; i < MAX_HEADERS; i++)
   {
-    conn->request->headers[i][0][0] = 0;
-    conn->request->headers[i][1][0] = 0;
+    request->headers[i][0][0] = 0;
+    request->headers[i][1][0] = 0;
   }
-  conn->request->num_headers = 0;
-  conn->request->last_header_element = NONE;
-  conn->request->upgrade = 0;
-  conn->request->keepalive = 0;
+  request->num_headers = 0;
+  request->last_header_element = NONE;
+  request->upgrade = 0;
+  request->keepalive = 0;
   return 0;
 }
 
 int url_cb(http_parser *p, const char *buf, size_t len)
 {
-  conn_t *conn = p->data;
-  free(conn->request->url);
-  conn->request->url = malloc((len + 1) * sizeof(char));
-  memcpy(conn->request->url, buf, len);
-  conn->request->url[len] = '\0';
+  http_request_t *request = p->data;
+  free(request->url);
+  request->url = malloc((len + 1) * sizeof(char));
+  memcpy(request->url, buf, len);
+  request->url[len] = '\0';
   return 0;
 }
 
 int headers_field_cb(http_parser *p, const char *buf, size_t len)
 {
-  conn_t *conn = p->data;
-  http_request_t *req = conn->request;
-  if (req->last_header_element != FIELD)
+  http_request_t *request = p->data;
+  if (request->last_header_element != FIELD)
   {
-    req->num_headers++;
+    request->num_headers++;
   }
-  strncat(req->headers[req->num_headers - 1][0], buf, len);
-  req->last_header_element = FIELD;
+  strncat(request->headers[request->num_headers - 1][0], buf, len);
+  request->last_header_element = FIELD;
   return 0;
 }
 
 int headers_value_cb(http_parser *p, const char *buf, size_t len)
 {
-  conn_t *conn = p->data;
-  http_request_t *req = conn->request;
-  strncat(req->headers[req->num_headers - 1][1], buf, len);
-  req->last_header_element = VALUE;
+  http_request_t *request = p->data;
+  strncat(request->headers[request->num_headers - 1][1], buf, len);
+  request->last_header_element = VALUE;
   return 0;
 }
 
 int headers_complete_cb(http_parser *p)
 {
-  conn_t *conn = p->data;
-  http_request_t *req = conn->request;
+  http_request_t *req = (http_request_t *)p->data;
   req->keepalive = http_should_keep_alive(p);
   req->http_major = p->http_major;
   req->http_minor = p->http_minor;
@@ -189,7 +186,8 @@ void http_404_response(char *resp)
 
 int response_message_begin_cb(http_parser *p)
 {
-  http_response_t *response = p->data;
+  http_link_context_t *context = p->data;
+  http_response_t *response = &context->response;
   for (int i = 0; i < MAX_HEADERS; i++)
   {
     response->headers[i][0][0] = 0;
@@ -204,7 +202,8 @@ int response_message_begin_cb(http_parser *p)
 
 int response_headers_field_cb(http_parser *p, const char *buf, size_t len)
 {
-  http_response_t *response = p->data;
+  http_link_context_t *context = p->data;
+  http_response_t *response = &context->response;
   if (response->last_header_element != FIELD)
   {
     response->num_headers++;
@@ -216,7 +215,8 @@ int response_headers_field_cb(http_parser *p, const char *buf, size_t len)
 
 int response_headers_value_cb(http_parser *p, const char *buf, size_t len)
 {
-  http_response_t *response = p->data;
+  http_link_context_t *context = p->data;
+  http_response_t *response = &context->response;
   strncat(response->headers[response->num_headers - 1][1], buf, len);
   response->last_header_element = VALUE;
   return 0;
@@ -224,17 +224,18 @@ int response_headers_value_cb(http_parser *p, const char *buf, size_t len)
 
 int response_headers_complete_cb(http_parser *p)
 {
-  http_response_t *response = p->data;
-  response->enable_compression = false;
+  http_link_context_t *context = p->data;
+  http_response_t *response = &context->response;
+  context->response.enable_compression = false;
   boolean already_compressed = false;
 
   for (int i = 0; i < response->num_headers; i++)
   {
     if (strcasecmp(response->headers[i][0], "Content-Type") == 0)
     {
-      for (int j = 0; j < response->server_config->num_gzip_mime_types; j++)
+      for (int j = 0; j < context->server_config->num_gzip_mime_types; j++)
       {
-        if (strstr(response->headers[i][1], response->server_config->gzip_mime_types[j]))
+        if (strstr(response->headers[i][1], context->server_config->gzip_mime_types[j]))
         {
           response->enable_compression = true;
           continue;
@@ -256,4 +257,29 @@ int response_headers_complete_cb(http_parser *p)
     response->enable_compression = false;
   }
   return 0;
+}
+
+void gzip_init_headers(http_response_t *response)
+{
+  gzip_state_t *state = response->gzip_state;
+  strcat(state->http_header, response->status_line);
+  strcat(state->http_header, "\r\n");
+  for (int i = 0; i < response->num_headers; ++i)
+  {
+    // Skip responses of non compressed headers
+    if (strcasecmp(response->headers[i][0], "Content-Length") == 0 || strcasecmp(response->headers[i][0], "Accept-Ranges") == 0)
+    {
+      continue;
+    }
+
+    strcat(state->http_header, response->headers[i][0]);
+    strcat(state->http_header, ": ");
+    strcat(state->http_header, response->headers[i][1]);
+    strcat(state->http_header, "\r\n");
+  }
+  // Add gzip headers
+  strcat(state->http_header, "Transfer-Encoding: chunked\r\n");
+  strcat(state->http_header, "Content-Encoding: gzip\r\n");
+
+  strcat(state->http_header, "\r\n");
 }

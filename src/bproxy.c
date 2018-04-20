@@ -6,66 +6,76 @@
  * found in the LICENSE file at https://github.com/bleenco/bproxy
  */
 #include "bproxy.h"
-#include "gzip.h"
 #include "log.h"
 
 #include <assert.h>
 
-#define CHECK(V) if ((V) != 0) abort()
+#define CHECK(V) \
+  if ((V) != 0)  \
+  abort()
 
-
-static void alloc_cb_override(uv_link_t* link,
-                              size_t suggested_size,
-                              uv_buf_t* buf) {
-  buf->base = malloc(suggested_size);
-  assert(buf->base != NULL);
-  buf->len = suggested_size;
-}
-
-static void write_link_cb(uv_link_t* source, int status, void* arg)
+static void write_link_cb(uv_link_t *source, int status, void *arg)
 {
   free(arg);
 }
 
-static void observer_connection_link_close_cb(uv_link_t* link) {
-  conn_t* conn;
+static void observer_connection_link_close_cb(uv_link_t *link)
+{
+  conn_t *conn;
 
   conn = link->data;
   conn_free(conn);
 }
 
-static void observer_connection_read_cb(uv_link_observer_t* observer, ssize_t nread,
-                                   const uv_buf_t* buf) {
-  if (nread >= 0)
-    return;
+static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nread,
+                                        const uv_buf_t *buf)
+{
+  conn_t *conn = (conn_t *)observer->data;
+  if (nread > 0)
+  {
+    if (conn->proxy_handle)
+    {
+      write_buf((uv_stream_t *)conn->proxy_handle, buf->base, nread);
+    }
+    else
+    {
+      proxy_ip_port ip_port = find_proxy_config(conn->http_link_context.request.hostname);
+      if (!ip_port.ip || !ip_port.port)
+      {
+        char *resp = malloc(1024 * sizeof(char));
+        http_404_response(resp);
+        uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
+        uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, NULL);
+        free(resp);
+        return;
+      }
+      proxy_http_request(ip_port.ip, ip_port.port, conn);
+    }
+  }
 
-  uv_link_close((uv_link_t*) observer, observer_connection_link_close_cb);
+  if (nread < 0)
+  {
+    uv_link_close((uv_link_t *)observer, observer_connection_link_close_cb);
+  }
 }
 
 void conn_init(uv_stream_t *handle)
 {
   conn_t *conn = malloc(sizeof(conn_t));
-  conn->parser = malloc(sizeof(http_parser));
-  conn->request = malloc(sizeof(http_request_t));
-  memset(conn->request, 0, sizeof *conn->request);
   conn->proxy_handle = NULL;
   conn->handle = handle;
-  http_parser_init(conn->parser, HTTP_REQUEST);
-  conn->parser->data = conn;
-  conn->ws_handshake_sent = false;
-  conn->type = TYPE_REQUEST;
 
-  CHECK(uv_link_source_init(&conn->source, (uv_stream_t*) conn->handle));
+  CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
   conn->source.data = conn;
-  CHECK(uv_link_init(&conn->middle, &middle_methods));
+  CHECK(uv_link_init(&conn->http_link, &http_link_methods));
   CHECK(uv_link_observer_init(&conn->observer));
-  conn->middle.data = conn;
-  CHECK(uv_link_chain((uv_link_t*)&conn->source, &conn->middle));
-  CHECK(uv_link_chain((uv_link_t*)&conn->middle, (uv_link_t*)&conn->observer));
+  http_link_init(&conn->http_link, &conn->http_link_context, server->config);
+  CHECK(uv_link_chain((uv_link_t *)&conn->source, &conn->http_link));
+  CHECK(uv_link_chain((uv_link_t *)&conn->http_link, (uv_link_t *)&conn->observer));
 
   conn->observer.observer_read_cb = observer_connection_read_cb;
   conn->observer.data = conn;
-  CHECK(uv_link_read_start((uv_link_t*) &conn->observer));
+  CHECK(uv_link_read_start((uv_link_t *)&conn->observer));
 }
 
 void conn_free(conn_t *conn)
@@ -75,19 +85,6 @@ void conn_free(conn_t *conn)
     if (!uv_is_closing((uv_handle_t *)conn->proxy_handle))
     {
       uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
-    }
-  }
-  if (conn)
-  {
-    if (conn->parser)
-    {
-      free(conn->parser);
-    }
-    if (conn->request)
-    {
-      free(conn->request->url);
-      free(conn->request->raw);
-      free(conn->request);
     }
   }
   free(conn->handle);
@@ -130,121 +127,23 @@ void write_cb(uv_write_t *req, int status)
   free(wr);
 }
 
-void close_cb(uv_handle_t *peer)
-{
-  conn_t* conn = (conn_t*)(((uv_link_source_t*)peer->data)->data);
-  conn_free(conn);
-}
-
-void link_close_cb(uv_link_t* source)
-{
-  conn_free((conn_t *)source->data);
-}
-
-void shutdown_cb(uv_shutdown_t *req, int status)
-{
-  uv_close((uv_handle_t *)req->handle, close_cb);
-  free(req);
-}
-
 void proxy_close_cb(uv_handle_t *peer)
 {
-  proxy_t *proxy_conn = peer->data;
-  if (proxy_conn)
-  {
-    if (proxy_conn->gzip_state)
-    {
-      gzip_free_state(proxy_conn->gzip_state);
-      free(proxy_conn->gzip_state);
-    }
-    free(proxy_conn->response.raw_body);
-    free(proxy_conn);
-  }
-}
-
-void compress_data(proxy_t *proxy_conn, char *data, int len)
-{
-  proxy_conn->gzip_state->raw_body = (unsigned char *)data;
-  proxy_conn->gzip_state->current_size_in = len;
-
-  if (proxy_conn->response.processed_data_len > 0)
-  {
-    proxy_conn->gzip_state->first_chunk = false;
-  }
-
-  proxy_conn->response.processed_data_len += len;
-  if (proxy_conn->response.processed_data_len == proxy_conn->response.expected_data_len)
-  {
-    proxy_conn->gzip_state->last_chunk = true;
-  }
-
-  gzip_compress(proxy_conn->gzip_state);
-  gzip_chunk_compress(proxy_conn->gzip_state);
+  free(peer);
 }
 
 void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
-  proxy_t *proxy_conn = handle->data;
-  conn_t *conn = proxy_conn->conn;
+  conn_t *conn = (conn_t *)handle->data;
 
   if (nread > 0)
   {
-    char *resp = buf->base;
-    ssize_t resp_size = nread;
-    if (conn->request->enable_compression && conn->type == TYPE_REQUEST)
+    uv_buf_t tmp_buf = uv_buf_init(buf->base, nread);
+    int err = uv_link_write(&conn->http_link, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
+    if (err)
     {
-      // enable gzip?
-      if (proxy_conn->gzip_state == NULL)
-      {
-        http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
-        http_parser_execute(&proxy_conn->response.parser,
-                            &resp_parser_settings, resp, nread);
-        if (proxy_conn->response.enable_compression)
-        {
-          // Parse status line
-          int status_line_len = strchr(resp, '\r') - resp;
-          memcpy(proxy_conn->response.status_line, resp, status_line_len);
-
-          // Get body start and body length
-          int headers_len = strstr(resp, "\r\n\r\n") - resp + 4; // 4 is for \r\n\r\n
-          int body_len = nread - headers_len;
-          proxy_conn->response.body_size = body_len;
-
-          proxy_conn->gzip_state = malloc(sizeof *proxy_conn->gzip_state);
-          gzip_init_state(proxy_conn->gzip_state);
-          gzip_init_headers(proxy_conn->gzip_state, &proxy_conn->response);
-          if (body_len == 0)
-          {
-            resp_size = 0;
-          }
-          if (body_len > 0)
-          {
-            proxy_conn->response.raw_body = malloc(body_len);
-            memcpy(proxy_conn->response.raw_body, &resp[headers_len], body_len);
-
-            compress_data(proxy_conn, proxy_conn->response.raw_body,
-                          proxy_conn->response.body_size);
-            resp = proxy_conn->gzip_state->chunk_body;
-            resp_size = proxy_conn->gzip_state->current_size_out;
-          }
-        }
-        else
-        {
-          conn->request->enable_compression = false;
-        }
-      }
-      else // Gzip initialized
-      {
-        compress_data(proxy_conn, resp, nread);
-        resp = proxy_conn->gzip_state->chunk_body;
-        resp_size = proxy_conn->gzip_state->current_size_out;
-      }
+      log_error("error writing to client: %s", strerror(err));
     }
-
-    char* tmp_shit = malloc(resp_size);
-    memcpy(tmp_shit, resp, resp_size);
-    uv_buf_t tmp_buf = uv_buf_init(tmp_shit, resp_size);
-    uv_link_write(&conn->middle, &tmp_buf, 1, NULL, write_link_cb, tmp_buf.base);
   }
   else if (nread < 0)
   {
@@ -258,140 +157,44 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       conn->proxy_handle = NULL;
     }
   }
-
-  free(buf->base);
+  if (nread <= 0)
+  {
+    free(buf->base);
+  }
 }
 
 void proxy_connect_cb(uv_connect_t *req, int status)
 {
-  proxy_t *proxy_conn = req->handle->data;
-  proxy_conn->connect_req = *req;
+  conn_t *conn = req->handle->data;
+  free(req);
 
   if (status < 0)
   {
-    uv_link_close((uv_link_t*) &proxy_conn->conn->observer, observer_connection_link_close_cb);
+    uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
     // TODO: write meaningful responses
     return;
   }
-  proxy_conn->conn->proxy_handle = req->handle;
 
-  http_parser_init(&proxy_conn->response.parser, HTTP_RESPONSE);
-  proxy_conn->response.server_config = server->config;
-  proxy_conn->response.parser.data = &proxy_conn->response;
-
-  uv_read_start(req->handle, alloc_cb, proxy_read_cb);
-  write_buf(req->handle, proxy_conn->conn->request->raw,
-            strlen(proxy_conn->conn->request->raw));
+  uv_read_start((uv_stream_t *)conn->proxy_handle, alloc_cb, proxy_read_cb);
+  http_request_t *request = &conn->http_link_context.request;
+  write_buf((uv_stream_t *)conn->proxy_handle, request->raw, request->raw_len);
 }
 
 void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
 {
   struct sockaddr_in dest;
   uv_ip4_addr(ip, port, &dest);
+  conn->proxy_handle = malloc(sizeof *conn->proxy_handle);
+  memset(conn->proxy_handle, 0, sizeof *conn->proxy_handle);
+  conn->proxy_handle->data = conn;
 
-  proxy_t *proxy_conn = malloc(sizeof(proxy_t));
-  memset(proxy_conn, 0, sizeof *proxy_conn);
-  proxy_conn->conn = conn;
-  proxy_conn->tcp.data = proxy_conn;
-  proxy_conn->gzip_state = NULL;
-  proxy_conn->response.processed_data_len = 0;
-  if (conn->request->upgrade)
-  {
-    conn->ws_handshake_sent = true;
-    conn->type = TYPE_WEBSOCKET;
-  }
+  uv_tcp_init(server->loop, conn->proxy_handle);
+  uv_tcp_keepalive(conn->proxy_handle, 1, 60);
 
-  uv_tcp_init(server->loop, &proxy_conn->tcp);
-  uv_tcp_keepalive(&proxy_conn->tcp, 1, 60);
-  uv_tcp_connect(&proxy_conn->connect_req, &proxy_conn->tcp,
+  uv_connect_t *connect_req = malloc(sizeof *connect_req);
+  memset(connect_req, 0, sizeof *connect_req);
+  uv_tcp_connect(connect_req, conn->proxy_handle,
                  (const struct sockaddr *)&dest, proxy_connect_cb);
-}
-
-static void link_shutdown_cb(uv_link_t* source, int status, void* arg)
-{
-  uv_link_close(source, link_close_cb);
-}
-
-static void read_cb_override(uv_link_t* link, ssize_t nread, const uv_buf_t* buf) {
-  conn_t *conn = link->data;
-
-    if (nread >= 0)
-    {
-      if (conn->proxy_handle && conn->type == TYPE_WEBSOCKET)
-      {
-        write_buf(conn->proxy_handle, buf->base, nread);
-      }
-      else
-      {
-        free(conn->request->raw);
-        conn->request->raw = malloc(nread + 1);
-        memcpy(conn->request->raw, buf->base, nread);
-        conn->request->raw[nread] = '\0';
-
-        size_t np = http_parser_execute(conn->parser, &parser_settings, buf->base,
-                                        nread);
-
-        if (np != nread)
-        {
-          uv_shutdown_t *req;
-          req = (uv_shutdown_t *)malloc(sizeof *req);
-          uv_link_shutdown(link, link_shutdown_cb, NULL);
-          //uv_shutdown(req, handle, shutdown_cb);
-        }
-
-        if (conn->proxy_handle)
-        {
-          gzip_state_t *state = ((proxy_t *)conn->proxy_handle->data)->gzip_state;
-          if (state)
-          {
-            gzip_free_state(state);
-            free(state);
-            ((proxy_t *)conn->proxy_handle->data)->gzip_state = NULL;
-          }
-          ((proxy_t *)conn->proxy_handle->data)->response.processed_data_len = 0;
-          write_buf(conn->proxy_handle, conn->request->raw, nread);
-        }
-
-        if (!conn->parser->upgrade)
-        {
-          log_debug("[http]: %s", conn->request->url);
-        }
-        else
-        {
-          log_debug("[websocket]: %s", conn->request->url);
-        }
-
-        if (conn->proxy_handle == NULL)
-        {
-          proxy_ip_port ip_port = find_proxy_config(conn->request->hostname);
-          if (!ip_port.ip || !ip_port.port)
-          {
-            char *resp = malloc(1024 * sizeof(char));
-            http_404_response(resp);
-            //write_buf(conn->handle, resp, strlen(resp));
-            uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
-            uv_link_write(link, &tmp_buf, 1, NULL, write_link_cb, tmp_buf.base);
-            free(resp);
-            return;
-          }
-          proxy_http_request(ip_port.ip, ip_port.port, conn);
-        }
-      }
-    }
-    else
-    {
-      if (nread != UV_EOF)
-      {
-        log_error("could not read from socket!");
-      }
-      if (conn->proxy_handle && !uv_is_closing((uv_handle_t *)conn->proxy_handle))
-      {
-        uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
-        conn->proxy_handle = NULL;
-      };
-      uv_link_close((uv_link_t*)&conn->observer, observer_connection_link_close_cb);
-    }
-    uv_link_propagate_read_cb(link, nread, buf);
 }
 
 void connection_cb(uv_stream_t *s, int status)
@@ -418,11 +221,6 @@ void connection_cb(uv_stream_t *s, int status)
   }
 
   conn_init(conn);
-  /*if (uv_read_start(conn, alloc_cb, read_cb))
-  {
-    log_error("cannot read from remote connection!");
-    return;
-  }*/
 }
 
 proxy_ip_port find_proxy_config(char *hostname)
@@ -556,15 +354,3 @@ int main(int argc, char **argv)
   uv_run(server->loop, UV_RUN_DEFAULT);
   return 0;
 }
-
-
-uv_link_methods_t middle_methods = {
-  .read_start = uv_link_default_read_start,
-  .read_stop = uv_link_default_read_stop,
-  .close = uv_link_default_close,
-  .write = uv_link_default_write,
-
-  /* Other doesn't matter in this example */
-  .alloc_cb_override = alloc_cb_override,
-  .read_cb_override = read_cb_override
-};

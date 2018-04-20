@@ -19,7 +19,7 @@
 #include "version.h"
 #include "config.h"
 
-#include "uv_link_t.h"
+#include "gzip.h"
 
 #define MAX_HEADERS 20
 #define MAX_ELEMENT_SIZE 500
@@ -33,9 +33,10 @@ enum header_element
   VALUE
 };
 
-typedef struct http_request_t
+typedef struct http_request_s
 {
   char *raw;
+  ssize_t raw_len;
   enum http_method method;
   char host[256];
   char *url;
@@ -49,44 +50,37 @@ typedef struct http_request_t
   int num_headers;
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
   boolean enable_compression;
+  http_parser parser;
 } http_request_t;
 
-typedef struct http_response_t
+typedef struct http_response_s
 {
   http_parser parser;
   char *raw_body;
+  size_t body_size;
 
   int expected_data_len;
   int processed_data_len;
-
-  size_t body_size;
 
   enum header_element last_header_element;
   int num_headers;
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
   char status_line[256];
   boolean enable_compression;
-  config_t *server_config;
+  gzip_state_t *gzip_state;
 } http_response_t;
 
-typedef struct conn_s
+typedef struct http_link_context_s
 {
-  int fd;
-  http_parser *parser;
-  http_request_t *request;
-  uv_stream_t *handle;
-  boolean ws_handshake_sent;
-  uv_stream_t *proxy_handle;
+  http_request_t request;
+  http_response_t response;
+  config_t *server_config; // TODO: Move this out, and use only part of configuration needed
   enum
   {
     TYPE_REQUEST,
     TYPE_WEBSOCKET
   } type;
-
-  uv_link_source_t source;
-  uv_link_t middle;
-  uv_link_observer_t observer;
-} conn_t;
+} http_link_context_t;
 
 int message_begin_cb(http_parser *p);
 int headers_complete_cb(http_parser *p);
@@ -106,6 +100,8 @@ int insert_header(char *src, char *resp);
 void insert_substring(char *a, char *b, int position);
 char *substring(char *string, int position, int length);
 void http_404_response(char *resp);
+
+void gzip_init_headers(http_response_t *response);
 
 // clang-format off
 static http_parser_settings parser_settings =
