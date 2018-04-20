@@ -89,12 +89,6 @@ int headers_complete_cb(http_parser *p)
 
 int body_cb(http_parser *p, const char *buf, size_t length)
 {
-  http_response_t *response = p->data;
-  free(response->raw_body);
-  response->raw_body = malloc(length);
-  strncpy(response->raw_body, buf, length);
-  response->body_size = length;
-
   return 0;
 }
 

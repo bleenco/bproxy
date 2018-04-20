@@ -12,7 +12,7 @@
 #include <assert.h>
 
 #define CHECK(V) if ((V) != 0) abort()
-#define CHECK_ALLOC(V) if ((V) == NULL) abort()
+
 
 static void alloc_cb_override(uv_link_t* link,
                               size_t suggested_size,
@@ -27,6 +27,21 @@ static void write_link_cb(uv_link_t* source, int status, void* arg)
   free(arg);
 }
 
+static void observer_connection_link_close_cb(uv_link_t* link) {
+  conn_t* conn;
+
+  conn = link->data;
+  conn_free(conn);
+}
+
+static void observer_connection_read_cb(uv_link_observer_t* observer, ssize_t nread,
+                                   const uv_buf_t* buf) {
+  if (nread >= 0)
+    return;
+
+  uv_link_close((uv_link_t*) observer, observer_connection_link_close_cb);
+}
+
 void conn_init(uv_stream_t *handle)
 {
   conn_t *conn = malloc(sizeof(conn_t));
@@ -35,22 +50,22 @@ void conn_init(uv_stream_t *handle)
   memset(conn->request, 0, sizeof *conn->request);
   conn->proxy_handle = NULL;
   conn->handle = handle;
-  handle->data = conn;
   http_parser_init(conn->parser, HTTP_REQUEST);
   conn->parser->data = conn;
   conn->ws_handshake_sent = false;
   conn->type = TYPE_REQUEST;
 
   CHECK(uv_link_source_init(&conn->source, (uv_stream_t*) conn->handle));
+  conn->source.data = conn;
   CHECK(uv_link_init(&conn->middle, &middle_methods));
-  //CHECK(uv_link_observer_init(&conn->observer));
+  CHECK(uv_link_observer_init(&conn->observer));
   conn->middle.data = conn;
   CHECK(uv_link_chain((uv_link_t*)&conn->source, &conn->middle));
-  //CHECK(uv_link_chain((uv_link_t*)&conn->middle, (uv_link_t*)&conn->observer));
+  CHECK(uv_link_chain((uv_link_t*)&conn->middle, (uv_link_t*)&conn->observer));
 
-  //conn->observer.observer_read_cb = fsh_connection_read_cb;
-  //conn->observer.data = conn;
-  CHECK(uv_link_read_start((uv_link_t*) &conn->middle));
+  conn->observer.observer_read_cb = observer_connection_read_cb;
+  conn->observer.data = conn;
+  CHECK(uv_link_read_start((uv_link_t*) &conn->observer));
 }
 
 void conn_free(conn_t *conn)
@@ -74,13 +89,9 @@ void conn_free(conn_t *conn)
       free(conn->request->raw);
       free(conn->request);
     }
-    if (conn)
-    {
-      free(conn);
-    }
   }
-
-  //free(conn->handle);
+  free(conn->handle);
+  free(conn);
 }
 
 void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
@@ -121,7 +132,8 @@ void write_cb(uv_write_t *req, int status)
 
 void close_cb(uv_handle_t *peer)
 {
-  conn_free((conn_t*)peer->data);
+  conn_t* conn = (conn_t*)(((uv_link_source_t*)peer->data)->data);
+  conn_free(conn);
 }
 
 void link_close_cb(uv_link_t* source)
@@ -143,6 +155,7 @@ void proxy_close_cb(uv_handle_t *peer)
     if (proxy_conn->gzip_state)
     {
       gzip_free_state(proxy_conn->gzip_state);
+      free(proxy_conn->gzip_state);
     }
     free(proxy_conn->response.raw_body);
     free(proxy_conn);
@@ -232,7 +245,6 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     memcpy(tmp_shit, resp, resp_size);
     uv_buf_t tmp_buf = uv_buf_init(tmp_shit, resp_size);
     uv_link_write(&conn->middle, &tmp_buf, 1, NULL, write_link_cb, tmp_buf.base);
-    //write_buf(conn->handle, resp, resp_size);
   }
   else if (nread < 0)
   {
@@ -257,7 +269,7 @@ void proxy_connect_cb(uv_connect_t *req, int status)
 
   if (status < 0)
   {
-    uv_close((uv_handle_t *)proxy_conn->conn->handle, close_cb);
+    uv_link_close((uv_link_t*) &proxy_conn->conn->observer, observer_connection_link_close_cb);
     // TODO: write meaningful responses
     return;
   }
@@ -295,6 +307,10 @@ void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
                  (const struct sockaddr *)&dest, proxy_connect_cb);
 }
 
+static void link_shutdown_cb(uv_link_t* source, int status, void* arg)
+{
+  uv_link_close(source, link_close_cb);
+}
 
 static void read_cb_override(uv_link_t* link, ssize_t nread, const uv_buf_t* buf) {
   conn_t *conn = link->data;
@@ -319,6 +335,7 @@ static void read_cb_override(uv_link_t* link, ssize_t nread, const uv_buf_t* buf
         {
           uv_shutdown_t *req;
           req = (uv_shutdown_t *)malloc(sizeof *req);
+          uv_link_shutdown(link, link_shutdown_cb, NULL);
           //uv_shutdown(req, handle, shutdown_cb);
         }
 
@@ -367,19 +384,14 @@ static void read_cb_override(uv_link_t* link, ssize_t nread, const uv_buf_t* buf
       {
         log_error("could not read from socket!");
       }
-      //if (!uv_is_closing((const uv_handle_t *)handle))
+      if (conn->proxy_handle && !uv_is_closing((uv_handle_t *)conn->proxy_handle))
       {
-        if (conn->proxy_handle && !uv_is_closing((uv_handle_t *)conn->proxy_handle))
-        {
-          uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
-          conn->proxy_handle = NULL;
-        }
-        //uv_close((uv_handle_t *)handle, close_cb);
-        uv_link_close(&conn->middle, link_close_cb);
-      }
+        uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
+        conn->proxy_handle = NULL;
+      };
+      uv_link_close((uv_link_t*)&conn->observer, observer_connection_link_close_cb);
     }
-
-    free(buf->base);
+    uv_link_propagate_read_cb(link, nread, buf);
 }
 
 void connection_cb(uv_stream_t *s, int status)
@@ -549,7 +561,7 @@ int main(int argc, char **argv)
 uv_link_methods_t middle_methods = {
   .read_start = uv_link_default_read_start,
   .read_stop = uv_link_default_read_stop,
-  .close = link_close_cb,
+  .close = uv_link_default_close,
   .write = uv_link_default_write,
 
   /* Other doesn't matter in this example */
