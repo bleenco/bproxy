@@ -69,7 +69,7 @@ typedef struct http_response_t
   config_t *server_config;
 } http_response_t;
 
-typedef struct conn_t
+typedef struct conn_s
 {
   int fd;
   http_parser *parser;
@@ -85,6 +85,7 @@ typedef struct conn_t
 
   uv_link_source_t source;
   uv_link_t middle;
+  uv_link_observer_t observer;
 } conn_t;
 
 int message_begin_cb(http_parser *p);
