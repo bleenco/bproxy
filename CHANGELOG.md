@@ -1,3 +1,19 @@
+<a name="0.4.0"></a>
+# 0.4.0 (2018-04-29)
+
+
+### Bug Fixes
+
+* **writing error:** fixed writing error by copying data to buffer ([c80f004](https://github.com/jkuri/bproxy/commit/c80f004))
+
+
+### Features
+
+* **uv_link_t:** used uv_link_t with connections closing ([67bbcf8](https://github.com/jkuri/bproxy/commit/67bbcf8))
+* **uv_link_t:** using uv_link_t for communication between client and proxy. ([6602e00](https://github.com/jkuri/bproxy/commit/6602e00))
+
+
+
 <a name="0.3.0"></a>
 # 0.3.0 (2018-04-11)
 
