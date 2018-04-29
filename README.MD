@@ -4,19 +4,22 @@ bproxy is lightweight super-fast minimal configuration proxy server written in C
 
 ### Building project
 
-```sh
-$ make
-```
+This step assumes you have Node.JS installed on your system.
 
-Build artifacts will be stored in `build/` directory.
-
-#### Static Build
-
-This is only possible on Linux for now. Makefile is configured to search for `libuv.a` in `/usr/local/lib/libuv.a`.
+Install dependencies.
 
 ```sh
-$ make static
+$ npm install
 ```
+
+Run the build.
+
+```sh
+$ npm run build
+```
+
+Build artifacts will be stored in `out/Release/` directory.
+
 
 ### Install
 
