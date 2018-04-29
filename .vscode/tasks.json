@@ -2,9 +2,13 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Makefile",
+      "label": "Build",
       "type": "shell",
-      "command": "make",
+      "command": "npm",
+      "args": [
+        "run",
+        "build"
+      ],
       "group": {
         "kind": "build",
         "isDefault": true

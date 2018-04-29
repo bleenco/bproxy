@@ -111,7 +111,8 @@ static http_parser_settings parser_settings =
   .on_header_value = headers_value_cb,
   .on_url = url_cb,
   .on_headers_complete = headers_complete_cb,
-  .on_message_complete = message_complete_cb };
+  .on_message_complete = message_complete_cb
+};
 
 static http_parser_settings resp_parser_settings =
 {
@@ -119,7 +120,8 @@ static http_parser_settings resp_parser_settings =
   .on_header_field = response_headers_field_cb,
   .on_header_value = response_headers_value_cb,
   .on_headers_complete = response_headers_complete_cb,
-  .on_body = body_cb };
+  .on_body = body_cb
+};
 // clang-format on
 
 #endif // _BPROXY_HTTP_H_
