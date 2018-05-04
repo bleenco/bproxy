@@ -24,7 +24,7 @@
       "src/gzip.c",
       "src/http_parser.c",
       "src/http.c",
-      "src/jsmn.c",
+      "src/cJSON.c",
       "src/http_link.c",
       "src/bproxy.c"
     ]
