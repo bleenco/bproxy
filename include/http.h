@@ -51,6 +51,8 @@ typedef struct http_request_s
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
   boolean enable_compression;
   http_parser parser;
+
+  char status_line[256];
 } http_request_t;
 
 typedef struct http_response_s
@@ -80,6 +82,12 @@ typedef struct http_link_context_s
     TYPE_REQUEST,
     TYPE_WEBSOCKET
   } type;
+
+  // Data for logging
+  bool print_log;
+  char peer_ip[45];
+  uint64_t request_time;
+  time_t request_timestamp;
 } http_link_context_t;
 
 int message_begin_cb(http_parser *p);

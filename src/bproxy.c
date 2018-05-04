@@ -75,6 +75,18 @@ void conn_init(uv_stream_t *handle)
   conn->observer.observer_read_cb = observer_connection_read_cb;
   conn->observer.data = conn;
   CHECK(uv_link_read_start((uv_link_t *)&conn->observer));
+
+  struct sockaddr_storage addr = {0};
+  int alen = sizeof addr;
+  uv_tcp_getpeername((uv_tcp_t*)conn->handle, (struct sockaddr *)&addr, &alen);
+  if(addr.ss_family == AF_INET)
+  {
+    uv_ip4_name((const struct sockaddr_in *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
+  }
+  else if(addr.ss_family == AF_INET6)
+  {
+    uv_ip6_name((const struct sockaddr_in6 *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
+  }
 }
 
 void conn_free(conn_t *conn)

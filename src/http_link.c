@@ -35,10 +35,19 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
   {
     if (context->type == TYPE_REQUEST)
     {
+      context->print_log = true;
+      context->request_time = uv_hrtime();
+      time(&context->request_timestamp);
+
       free(context->request.raw);
       context->request.raw = malloc(nread);
       memcpy(context->request.raw, buf->base, nread);
       context->request.raw_len = nread;
+
+      // Parse status line
+      int status_line_len = strchr(buf->base, '\r') - buf->base;
+      memcpy(context->request.status_line, buf->base, status_line_len);
+      context->request.status_line[status_line_len] = '\0';
 
       size_t np = http_parser_execute(&context->request.parser, &parser_settings, buf->base,
                                       nread);
@@ -65,15 +74,6 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         context->response.gzip_state = NULL;
       }
       context->response.processed_data_len = 0;
-
-      if (!context->request.parser.upgrade)
-      {
-        log_debug("[http]: %s", context->request.url);
-      }
-      else
-      {
-        log_debug("[websocket]: %s", context->request.url);
-      }
     }
   }
   // Closing everything is observer's job, just propagate it to him
@@ -159,6 +159,25 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
     {
       compress_data(response, resp, nread, &resp, &resp_size);
     }
+  }
+
+  if(context->print_log)
+  {
+    context->print_log = false;
+    double timeDiff = (uv_hrtime() - context->request_time) / 1000000.0;
+    struct tm * timeinfo;
+    timeinfo = localtime ( &context->request_timestamp );
+    char timeString[256];
+    strftime(timeString, sizeof(timeString), "%d/%b/%Y:%T %z", timeinfo);
+    // IP - [response time] - [date time] "GET url http" HTTP_STATUS_NUM host
+    log_debug("%s - [%fms] - [%s] \"%s\" %u %s",
+        context->peer_ip,
+        timeDiff,
+        timeString,
+        context->request.status_line,
+        response->parser.status_code,
+        context->request.host
+    );
   }
   uv_buf_t tmp_buf = uv_buf_init(resp, resp_size);
   return uv_link_propagate_write(link->parent, source, &tmp_buf, 1, send_handle, cb, resp);
