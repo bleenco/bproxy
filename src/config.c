@@ -11,15 +11,15 @@
 char *read_file(char *path)
 {
   FILE *f = fopen(path, "rb");
+  if (!f)
+  {
+    log_fatal("could not open config file: %s!", path);
+    exit(1);
+  }
+
   fseek(f, 0, SEEK_END);
   long fsize = ftell(f);
   fseek(f, 0, SEEK_SET);
-
-  if (!f)
-  {
-    log_error("could not open file %s for reading!", path);
-    exit(1);
-  }
 
   char *contents = malloc(fsize + 1);
   fread(contents, fsize, 1, f);
@@ -71,7 +71,8 @@ void parse_config(const char *json_string, config_t *config)
   if (cJSON_IsString(log_file) && log_file->valuestring)
   {
     FILE *fp = fopen(log_file->valuestring, "w+");
-    if (fp) {
+    if (fp)
+    {
       log_set_fp(fp);
     }
     else
