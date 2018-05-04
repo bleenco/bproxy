@@ -35,7 +35,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
   {
     if (context->type == TYPE_REQUEST)
     {
-      context->first_response = true;
+      context->initial_reply = true;
       context->request_time = uv_hrtime();
       time(&context->request_timestamp);
 
@@ -47,7 +47,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
       // Parse status line
       free(context->request.status_line);
       int status_line_len = strchr(buf->base, '\r') - buf->base;
-      context->request.status_line = malloc(status_line_len +1);
+      context->request.status_line = malloc(status_line_len + 1);
       memcpy(context->request.status_line, buf->base, status_line_len);
       context->request.status_line[status_line_len] = '\0';
 
@@ -116,50 +116,42 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
   size_t nread = bufs[0].len;
   size_t resp_size = nread;
 
-  if(nread > 0)
+  if (nread > 0)
   {
-    if(context->first_response)
+    if (context->initial_reply)
     {
       http_parser_init(&response->parser, HTTP_RESPONSE);
       http_parser_execute(&response->parser, &resp_parser_settings, resp, nread);
     }
-    if (context->type == TYPE_REQUEST && context->request.enable_compression)
+    if (context->type == TYPE_REQUEST && context->request.enable_compression && response->enable_compression)
     {
-      // enable gzip?
       if (response->gzip_state == NULL)
       {
-        if (response->enable_compression)
+        // Parse status line
+        int status_line_len = strchr(resp, '\r') - resp;
+        memcpy(response->status_line, resp, status_line_len);
+        response->status_line[status_line_len] = '\0';
+
+        // Get body start and body length
+        int headers_len = strstr(resp, "\r\n\r\n") - resp + 4; // 4 is for \r\n\r\n
+        int body_len = nread - headers_len;
+        response->body_size = body_len;
+
+        response->gzip_state = malloc(sizeof *response->gzip_state);
+        gzip_init_state(response->gzip_state);
+        gzip_init_headers(response);
+        if (body_len == 0)
         {
-          // Parse status line
-          int status_line_len = strchr(resp, '\r') - resp;
-          memcpy(response->status_line, resp, status_line_len);
-          response->status_line[status_line_len] = '\0';
-
-          // Get body start and body length
-          int headers_len = strstr(resp, "\r\n\r\n") - resp + 4; // 4 is for \r\n\r\n
-          int body_len = nread - headers_len;
-          response->body_size = body_len;
-
-          response->gzip_state = malloc(sizeof *response->gzip_state);
-          gzip_init_state(response->gzip_state);
-          gzip_init_headers(response);
-          if (body_len == 0)
-          {
-            resp_size = 0;
-          }
-          if (body_len > 0)
-          {
-            free(response->raw_body);
-            response->raw_body = malloc(body_len);
-            memcpy(response->raw_body, &resp[headers_len], body_len);
-
-            compress_data(response, response->raw_body,
-                          response->body_size, &resp, &resp_size);
-          }
+          resp_size = 0;
         }
-        else
+        if (body_len > 0)
         {
-          context->request.enable_compression = false;
+          free(response->raw_body);
+          response->raw_body = malloc(body_len);
+          memcpy(response->raw_body, &resp[headers_len], body_len);
+
+          compress_data(response, response->raw_body,
+                        response->body_size, &resp, &resp_size);
         }
       }
       else // Gzip initialized
@@ -168,23 +160,22 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
       }
     }
 
-    if(context->first_response)
+    if (context->initial_reply)
     {
-      context->first_response = false;
+      context->initial_reply = false;
       double timeDiff = (uv_hrtime() - context->request_time) / 1000000.0;
-      struct tm * timeinfo;
-      timeinfo = localtime ( &context->request_timestamp );
+      struct tm *timeinfo;
+      timeinfo = localtime(&context->request_timestamp);
       char timeString[256];
       strftime(timeString, sizeof(timeString), "%d/%b/%Y:%T %z", timeinfo);
       // IP - [response time] - [date time] "GET url http" HTTP_STATUS_NUM host
       log_debug("%s - [%.3fms] - [%s] \"%s\" %u %s",
-          context->peer_ip,
-          timeDiff,
-          timeString,
-          context->request.status_line,
-          response->parser.status_code,
-          context->request.host
-      );
+                context->peer_ip,
+                timeDiff,
+                timeString,
+                context->request.status_line,
+                response->parser.status_code,
+                context->request.host);
     }
   }
   uv_buf_t tmp_buf = uv_buf_init(resp, resp_size);

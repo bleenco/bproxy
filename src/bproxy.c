@@ -78,12 +78,12 @@ void conn_init(uv_stream_t *handle)
 
   struct sockaddr_storage addr = {0};
   int alen = sizeof addr;
-  uv_tcp_getpeername((uv_tcp_t*)conn->handle, (struct sockaddr *)&addr, &alen);
-  if(addr.ss_family == AF_INET)
+  uv_tcp_getpeername((uv_tcp_t *)conn->handle, (struct sockaddr *)&addr, &alen);
+  if (addr.ss_family == AF_INET)
   {
     uv_ip4_name((const struct sockaddr_in *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
   }
-  else if(addr.ss_family == AF_INET6)
+  else if (addr.ss_family == AF_INET6)
   {
     uv_ip6_name((const struct sockaddr_in6 *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
   }

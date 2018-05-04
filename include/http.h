@@ -52,7 +52,7 @@ typedef struct http_request_s
   boolean enable_compression;
   http_parser parser;
 
-  char* status_line;
+  char *status_line;
 } http_request_t;
 
 typedef struct http_response_s
@@ -82,7 +82,7 @@ typedef struct http_link_context_s
     TYPE_REQUEST,
     TYPE_WEBSOCKET
   } type;
-  bool first_response;
+  bool initial_reply;
 
   // Data for logging
   char peer_ip[45];
