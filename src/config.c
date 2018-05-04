@@ -40,6 +40,7 @@ void parse_config(const char *json_string, config_t *config)
   const cJSON *proxy_hosts = NULL;
   const cJSON *proxy_ip = NULL;
   const cJSON *proxy_port = NULL;
+  const cJSON *log_file = NULL;
 
   cJSON *json = cJSON_Parse(json_string);
   if (!json)
@@ -55,7 +56,7 @@ void parse_config(const char *json_string, config_t *config)
   }
 
   port = cJSON_GetObjectItemCaseSensitive(json, "port");
-  if (cJSON_IsNumber(port) && port->valueint != NULL)
+  if (cJSON_IsNumber(port) && port->valueint)
   {
     config->port = port->valueint;
   }
@@ -64,6 +65,19 @@ void parse_config(const char *json_string, config_t *config)
     log_fatal("could not find listen port in configuration JSON!");
     cJSON_Delete(json);
     exit(1);
+  }
+
+  log_file = cJSON_GetObjectItemCaseSensitive(json, "log_file");
+  if (cJSON_IsString(log_file) && log_file->valuestring)
+  {
+    FILE *fp = fopen(log_file->valuestring, "w+");
+    if (fp) {
+      log_set_fp(fp);
+    }
+    else
+    {
+      log_error("cannot open file for writing: %s!", log_file->valuestring);
+    }
   }
 
   config->num_gzip_mime_types = 0;
