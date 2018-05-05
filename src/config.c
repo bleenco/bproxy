@@ -82,15 +82,15 @@ void parse_config(const char *json_string, config_t *config)
   }
 
   config->num_gzip_mime_types = 0;
-  mime_types = cJSON_GetObjectItemCaseSensitive(json, "mime_types");
+  mime_types = cJSON_GetObjectItemCaseSensitive(json, "gzip_mime_types");
   cJSON_ArrayForEach(mime_type, mime_types)
   {
     if (cJSON_IsString(mime_type) && mime_type->valuestring)
     {
       config->num_gzip_mime_types++;
       config->gzip_mime_types[config->num_gzip_mime_types - 1] = malloc(sizeof(char) * 100);
-      memset(config->gzip_mime_types[config->num_gzip_mime_types - 1], 0, 100);
       memcpy(config->gzip_mime_types[config->num_gzip_mime_types - 1], mime_type->valuestring, strlen(mime_type->valuestring));
+      config->gzip_mime_types[config->num_gzip_mime_types - 1][strlen(mime_type->valuestring)] = '\0';
     }
   }
 

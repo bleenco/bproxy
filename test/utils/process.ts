@@ -19,9 +19,6 @@ function _run(options: ExecOptions, cmd: string, args: string[]): Promise<Proces
     let stdout = '';
     let stderr = '';
     const cwd = process.cwd();
-    console.log(
-      `==========================================================================================`
-    );
 
     args = args.filter(x => x !== undefined);
     const flags = [
@@ -31,8 +28,6 @@ function _run(options: ExecOptions, cmd: string, args: string[]): Promise<Proces
       .join(', ')
       .replace(/^(.+)$/, ' [$1]');
 
-    console.log(chalk.blue(`Running \`${cmd} ${args.map(x => `"${x}"`).join(' ')}\`${flags}...`));
-    console.log(chalk.blue(`CWD: ${cwd}`));
     const spawnOptions: any = { cwd };
 
     if (process.platform.startsWith('win')) {
@@ -46,7 +41,7 @@ function _run(options: ExecOptions, cmd: string, args: string[]): Promise<Proces
     _processes.push(childProcess);
 
     childProcess.stdout.on('data', (data: Buffer) => {
-      resolve();
+      setTimeout(() => resolve(), 100);
 
       stdout += data.toString();
       if (options.silent) {
@@ -179,6 +174,10 @@ export function exitCode(cmd: string): Promise<any> {
   });
 }
 
-export function bproxy(verbose = false) {
-  return _run({ silent: !verbose }, './out/Release/bproxy', ['-c', 'bproxy.json']);
+export function bproxy(verbose = false, args: string[] = ['-c', 'bproxy.json']) {
+  return _run({ silent: !verbose }, './out/Release/bproxy', args);
+}
+
+export function runNode(verbose = false, args: string[]) {
+  return _run({ silent: !verbose }, "node", args);
 }
