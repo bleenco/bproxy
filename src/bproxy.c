@@ -14,6 +14,8 @@
   if ((V) != 0)  \
   abort()
 
+#define CHECK_ALLOC(V) if ((V) == NULL) abort()
+
 static void write_link_cb(uv_link_t *source, int status, void *arg)
 {
   free(arg);
@@ -24,6 +26,7 @@ static void observer_connection_link_close_cb(uv_link_t *link)
   conn_t *conn;
 
   conn = link->data;
+  SSL_free(conn->ssl);
   conn_free(conn);
 }
 
@@ -54,22 +57,40 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
 
   if (nread < 0)
   {
+    uv_link_t* error_link;
+    int err = uv_link_errno(&error_link, -nread);
+    if(err != 135170){
+      // If not connection closing!
+      const char* estr = uv_link_strerror((uv_link_t*)observer, nread);
+      log_error("[%d]: %s", err, estr);
+    }
     uv_link_close((uv_link_t *)observer, observer_connection_link_close_cb);
   }
 }
 
 void conn_init(uv_stream_t *handle)
 {
+  int err = 0;
   conn_t *conn = malloc(sizeof(conn_t));
   conn->proxy_handle = NULL;
   conn->handle = handle;
 
+  // SSL
+  CHECK_ALLOC(conn->ssl = SSL_new(ctx));
+  SSL_set_accept_state(conn->ssl);
+
   CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
   conn->source.data = conn;
+
+  CHECK_ALLOC(conn->ssl_link =
+        uv_ssl_create(uv_default_loop(), conn->ssl, &err));
+  CHECK(err);
+
   CHECK(uv_link_init(&conn->http_link, &http_link_methods));
   CHECK(uv_link_observer_init(&conn->observer));
   http_link_init(&conn->http_link, &conn->http_link_context, server->config);
-  CHECK(uv_link_chain((uv_link_t *)&conn->source, &conn->http_link));
+  CHECK(uv_link_chain((uv_link_t *)&conn->source, conn->ssl_link));
+  CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
   CHECK(uv_link_chain((uv_link_t *)&conn->http_link, (uv_link_t *)&conn->observer));
 
   conn->observer.observer_read_cb = observer_connection_read_cb;
@@ -278,6 +299,20 @@ proxy_ip_port find_proxy_config(char *hostname)
 
 int server_init()
 {
+  SSL_library_init();
+  OpenSSL_add_all_algorithms();
+  OpenSSL_add_all_digests();
+  SSL_load_error_strings();
+  ERR_load_crypto_strings();
+
+  /* Initialize SSL_CTX */
+  CHECK_ALLOC(ctx = SSL_CTX_new(SSLv23_method()));
+
+  SSL_CTX_use_certificate_file(ctx, "test/keys/cert.pem", SSL_FILETYPE_PEM);
+  SSL_CTX_use_PrivateKey_file(ctx, "test/keys/key.pem", SSL_FILETYPE_PEM);
+
+ CHECK(uv_ssl_setup_recommended_secure_context(ctx));
+
   server->loop = uv_default_loop();
 
   if (uv_tcp_init(server->loop, &server->tcp))

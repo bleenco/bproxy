@@ -18,6 +18,14 @@
 #include "config.h"
 #include "version.h"
 
+#include "openssl/bio.h"
+#include "openssl/err.h"
+#include "openssl/evp.h"
+#include "openssl/pem.h"
+#include "openssl/x509.h"
+
+#include "uv_ssl_t.h"
+
 typedef struct
 {
   uv_write_t req;
@@ -43,6 +51,9 @@ typedef struct conn_s
   uv_link_source_t source;
   uv_link_t http_link;
   uv_link_observer_t observer;
+
+  SSL* ssl;
+  uv_ssl_t* ssl_link;
 } conn_t;
 
 typedef struct proxy_ip_port
@@ -52,6 +63,7 @@ typedef struct proxy_ip_port
 } proxy_ip_port;
 
 server_t *server;
+static SSL_CTX* ctx;
 
 static void conn_init(uv_stream_t *handle);
 static void conn_free(conn_t *conn);
