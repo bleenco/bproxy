@@ -31,7 +31,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
 {
   http_link_context_t *context = link->data;
 
-  if (nread >= 0)
+  if (nread > 0)
   {
     if (context->type == TYPE_REQUEST)
     {
