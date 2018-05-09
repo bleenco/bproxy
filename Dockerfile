@@ -30,6 +30,6 @@ RUN apt-get update && apt-get install libc-bin -y && rm -rf /var/lib/apt/lists/*
 COPY --from=build /bproxy/bproxy.json /
 COPY --from=build /bproxy/out/Release/bproxy /usr/bin/bproxy
 
-EXPOSE 80
+EXPOSE 80 443
 
 CMD [ "bproxy" ]
