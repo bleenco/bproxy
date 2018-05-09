@@ -1,6 +1,10 @@
-## bproxy
+<p align="center" style="margin-top: 50px; margin-bottom: 50px">
+  <img src="https://user-images.githubusercontent.com/1796022/39833139-8497ece0-53c9-11e8-8fc4-12517a2d303b.png">
+</p>
 
-bproxy is lightweight super-fast minimal configuration proxy server written in C based on `libuv` that supports gzip natively.
+bproxy is lightweight super-fast minimal configuration proxy server written in C based on `libuv`.
+
+It supports `gzip` compression and `SSL` out-of-the-box.
 
 ### Building project
 
@@ -9,7 +13,7 @@ This step assumes you have Node.JS installed on your system.
 Install dependencies.
 
 ```sh
-$ npm install
+$ npm install --prod
 ```
 
 Run the build.
@@ -26,19 +30,42 @@ Build artifacts will be stored in `out/Release/` directory.
 Script will install `bproxy` in `/usr/local/bin`.
 
 ```sh
-sudo make install
+$ sudo make install
 ```
 
 ### Running server
 
 ```sh
-./bproxy
+$ ./bproxy
 ```
 
 or
 
 ```
-./bproxy -c /path/to/bproxy-config.json
+$ ./bproxy -c /path/to/bproxy-config.json
+```
+
+### Building Docker Image
+
+```sh
+$ make docker_image
+```
+
+### Using Docker
+
+You can pull image from Docker Hub as `docker pull bleenco/bproxy` or build from source as stated in previous section.
+
+Then on your server:
+
+```
+$ docker run -it --name bproxy --net host -v ~/path/to/bproxy.json:/bproxy/bproxy.json -v /var/log/bproxy.log:/var/log/bproxy.log --restart always bleenco/bproxy
+```
+
+### Running Tests
+
+```sh
+$ npm install
+$ npm test
 ```
 
 ### LICENSE
