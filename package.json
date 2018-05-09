@@ -1,6 +1,6 @@
 {
   "name": "bproxy",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "test": "node ./test/run.js",
@@ -13,6 +13,10 @@
     "Martin Oprešnik <martin.opresnik@bleenco.com>"
   ],
   "licence": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bleenco/bproxy.git"
+  },
   "dependencies": {
     "gypkg": "^2.7.7",
     "rimraf": "^2.6.2"
