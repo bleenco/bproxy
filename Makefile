@@ -13,6 +13,6 @@ distclean:
 	@rm -rf out/ gypkg_deps/
 
 docker_image:
-	docker build -t bproxy .
+	docker build -t bleenco/bproxy .
 
 .PHONY: all clean dist distclean

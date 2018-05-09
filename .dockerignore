@@ -1,0 +1,10 @@
+gypkg_deps/
+node_modules/
+out/
+test/
+.abstruse.yml
+CHANGELOG.md
+bproxy.log
+LICENSE
+package-lock.json
+README.md

@@ -1,6 +1,6 @@
 {
-  "port": 8080,
-  "secure_port": 8081,
+  "port": 80,
+  "secure_port": 443,
   "gzip_mime_types": ["text/css", "application/javascript", "application/x-javascript"],
   "log_file": "bproxy.log",
   "proxies": [
