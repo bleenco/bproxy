@@ -32,6 +32,7 @@ char *read_file(char *path)
 void parse_config(const char *json_string, config_t *config)
 {
   const cJSON *port = NULL;
+  const cJSON *secure_port = NULL;
   const cJSON *mime_type = NULL;
   const cJSON *mime_types = NULL;
   const cJSON *proxies = NULL;
@@ -41,6 +42,10 @@ void parse_config(const char *json_string, config_t *config)
   const cJSON *proxy_ip = NULL;
   const cJSON *proxy_port = NULL;
   const cJSON *log_file = NULL;
+  const cJSON *certificate_path = NULL;
+  const cJSON *key_path = NULL;
+
+  memset(config, 0, sizeof *config);
 
   cJSON *json = cJSON_Parse(json_string);
   if (!json)
@@ -65,6 +70,36 @@ void parse_config(const char *json_string, config_t *config)
     log_fatal("could not find listen port in configuration JSON!");
     cJSON_Delete(json);
     exit(1);
+  }
+
+  secure_port = cJSON_GetObjectItemCaseSensitive(json, "secure_port");
+  if (cJSON_IsNumber(secure_port) && secure_port->valueint)
+  {
+    config->secure_port = secure_port->valueint;
+  }
+  else if(secure_port)
+  {
+    log_fatal("secure_port in wrong format in configuration JSON!");
+    cJSON_Delete(json);
+    exit(1);
+  }
+
+  certificate_path = cJSON_GetObjectItemCaseSensitive(json, "certificate_path");
+  if (cJSON_IsString(certificate_path) && certificate_path->valuestring)
+  {
+    size_t len = strlen(certificate_path->valuestring);
+    config->certificate_path = malloc(len +1);
+    strcpy(config->certificate_path, certificate_path->valuestring);
+    config->certificate_path[len] = '\0';
+  }
+
+  key_path = cJSON_GetObjectItemCaseSensitive(json, "key_path");
+  if (cJSON_IsString(key_path) && key_path->valuestring)
+  {
+    size_t len = strlen(key_path->valuestring);
+    config->key_path = malloc(len +1);
+    strcpy(config->key_path, key_path->valuestring);
+    config->key_path[len] = '\0';
   }
 
   log_file = cJSON_GetObjectItemCaseSensitive(json, "log_file");
@@ -127,6 +162,11 @@ void parse_config(const char *json_string, config_t *config)
     {
       config->proxies[config->num_proxies - 1]->port = proxy_port->valueint;
     }
+  }
+
+  if(config->certificate_path && config->key_path && config->secure_port > 0)
+  {
+    config->ssl_enabled = true;
   }
 
   cJSON_Delete(json);

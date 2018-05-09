@@ -1,5 +1,8 @@
 {
   "port": 8080,
+  "secure_port": 8081,
+  "certificate_path": "test/keys/localhost.crt",
+  "key_path": "test/keys/localhost.key",
   "gzip_mime_types": ["text/css", "application/javascript", "application/x-javascript"],
   "log_file": "bproxy.log",
   "proxies": [

@@ -36,6 +36,7 @@ typedef struct server_t
 {
   uv_loop_t *loop;
   uv_tcp_t tcp;
+  uv_tcp_t secure_tcp;
   struct sockaddr_in address;
   config_t *config;
   int num_configs;
@@ -83,6 +84,7 @@ static void connection_cb(uv_stream_t *s, int status);
 
 static proxy_ip_port find_proxy_config(char *hostname);
 static int server_init();
+static int server_listen(unsigned short port, uv_tcp_t *tcp);
 void parse_args(int argc, char **argv);
 void usage();
 
