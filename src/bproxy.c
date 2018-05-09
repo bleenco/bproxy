@@ -7,6 +7,7 @@
  */
 #include "bproxy.h"
 #include "log.h"
+#include <arpa/inet.h>
 
 #include <assert.h>
 
@@ -71,43 +72,61 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
 void conn_init(uv_stream_t *handle)
 {
   int err = 0;
+  bool ssl_conn = false;
+
   conn_t *conn = malloc(sizeof(conn_t));
-  conn->proxy_handle = NULL;
+  memset(conn, 0, sizeof *conn);
   conn->handle = handle;
 
-  // SSL
-  CHECK_ALLOC(conn->ssl = SSL_new(ctx));
-  SSL_set_accept_state(conn->ssl);
-
-  CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
-  conn->source.data = conn;
-
-  CHECK_ALLOC(conn->ssl_link =
-        uv_ssl_create(uv_default_loop(), conn->ssl, &err));
-  CHECK(err);
-
-  CHECK(uv_link_init(&conn->http_link, &http_link_methods));
-  CHECK(uv_link_observer_init(&conn->observer));
-  http_link_init(&conn->http_link, &conn->http_link_context, server->config);
-  CHECK(uv_link_chain((uv_link_t *)&conn->source, conn->ssl_link));
-  CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
-  CHECK(uv_link_chain((uv_link_t *)&conn->http_link, (uv_link_t *)&conn->observer));
-
-  conn->observer.observer_read_cb = observer_connection_read_cb;
-  conn->observer.data = conn;
-  CHECK(uv_link_read_start((uv_link_t *)&conn->observer));
-
+  // Get remote address
   struct sockaddr_storage addr = {0};
   int alen = sizeof addr;
   uv_tcp_getpeername((uv_tcp_t *)conn->handle, (struct sockaddr *)&addr, &alen);
   if (addr.ss_family == AF_INET)
   {
     uv_ip4_name((const struct sockaddr_in *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
+    ssl_conn = ((const struct sockaddr_in *)&addr)->sin_port == server->config->secure_port;
   }
   else if (addr.ss_family == AF_INET6)
   {
     uv_ip6_name((const struct sockaddr_in6 *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
   }
+  // Get local port
+  alen = sizeof addr;
+  uv_tcp_getsockname((uv_tcp_t *)conn->handle, (struct sockaddr *)&addr, &alen);
+  if (addr.ss_family == AF_INET)
+  {
+    ssl_conn = ntohs(((const struct sockaddr_in *)&addr)->sin_port) == server->config->secure_port;
+  }
+  else if (addr.ss_family == AF_INET6)
+  {
+    ssl_conn = ntohs(((const struct sockaddr_in6 *)&addr)->sin6_port) == server->config->secure_port;
+  }
+
+  CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
+  conn->source.data = conn;
+
+  CHECK(uv_link_observer_init(&conn->observer));
+  CHECK(uv_link_init(&conn->http_link, &http_link_methods));
+  http_link_init(&conn->http_link, &conn->http_link_context, server->config);
+
+  if(ssl_conn)
+  {
+    CHECK_ALLOC(conn->ssl = SSL_new(ctx));
+    SSL_set_accept_state(conn->ssl);
+    CHECK_ALLOC(conn->ssl_link =
+         uv_ssl_create(uv_default_loop(), conn->ssl, &err));
+    CHECK(err);
+    CHECK(uv_link_chain((uv_link_t *)&conn->source, conn->ssl_link));
+    CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
+  }else{
+    CHECK(uv_link_chain((uv_link_t *)&conn->source, &conn->http_link));
+  }
+  CHECK(uv_link_chain((uv_link_t *)&conn->http_link, (uv_link_t *)&conn->observer));
+
+  conn->observer.observer_read_cb = observer_connection_read_cb;
+  conn->observer.data = conn;
+  CHECK(uv_link_read_start((uv_link_t *)&conn->observer));
 }
 
 void conn_free(conn_t *conn)
@@ -297,41 +316,63 @@ proxy_ip_port find_proxy_config(char *hostname)
   return ip_port;
 }
 
-int server_init()
+int server_listen(unsigned short port, uv_tcp_t *tcp)
 {
-  SSL_library_init();
-  OpenSSL_add_all_algorithms();
-  OpenSSL_add_all_digests();
-  SSL_load_error_strings();
-  ERR_load_crypto_strings();
-
-  /* Initialize SSL_CTX */
-  CHECK_ALLOC(ctx = SSL_CTX_new(SSLv23_method()));
-
-  SSL_CTX_use_certificate_file(ctx, "test/keys/cert.pem", SSL_FILETYPE_PEM);
-  SSL_CTX_use_PrivateKey_file(ctx, "test/keys/key.pem", SSL_FILETYPE_PEM);
-
- CHECK(uv_ssl_setup_recommended_secure_context(ctx));
-
-  server->loop = uv_default_loop();
-
-  if (uv_tcp_init(server->loop, &server->tcp))
+  if (uv_tcp_init(server->loop, tcp))
   {
     log_error("cannot init tcp connection!");
     return 1;
   }
-  uv_ip4_addr("0.0.0.0", server->config->port, &server->address);
-  if (uv_tcp_bind(&server->tcp, (const struct sockaddr *)&server->address, 0))
+  uv_ip4_addr("0.0.0.0", port, &server->address);
+  if (uv_tcp_bind(tcp, (const struct sockaddr *)&server->address, 0))
   {
     log_error("cannot bind server! check your permissions and another service running on same port.");
     return 1;
   }
-  if (uv_listen((uv_stream_t *)&server->tcp, 4096, connection_cb))
+  if (uv_listen((uv_stream_t *)tcp, 4096, connection_cb))
   {
     log_error("server listen error!");
     return 1;
   }
-  log_info("listening on 0.0.0.0:%d", server->config->port);
+  log_info("listening on 0.0.0.0:%d", port);
+  return 0;
+}
+
+int server_init()
+{
+  if(server->config->ssl_enabled > 0)
+  {
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    OpenSSL_add_all_digests();
+    SSL_load_error_strings();
+    ERR_load_crypto_strings();
+
+    /* Initialize SSL_CTX */
+    CHECK_ALLOC(ctx = SSL_CTX_new(SSLv23_method()));
+
+    if(!SSL_CTX_use_certificate_file(ctx, server->config->certificate_path, SSL_FILETYPE_PEM))
+    {
+      log_error("Could not load certificate file!");
+      server->config->ssl_enabled = false;
+    }
+    if(!SSL_CTX_use_PrivateKey_file(ctx, server->config->key_path, SSL_FILETYPE_PEM))
+    {
+      log_error("Could not load key file!");
+      server->config->ssl_enabled = false;
+    }
+
+    CHECK(uv_ssl_setup_recommended_secure_context(ctx));
+  }
+
+  server->loop = uv_default_loop();
+
+  server_listen(server->config->port, &server->tcp);
+
+  if(server->config->ssl_enabled)
+  {
+    server_listen(server->config->secure_port, &server->secure_tcp);
+  }
 
   return 0;
 }

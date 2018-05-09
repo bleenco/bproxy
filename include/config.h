@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "cJSON.h"
 #include "log.h"
@@ -30,10 +31,14 @@ typedef struct proxy_config_t
 typedef struct config_t
 {
   unsigned short port;
+  unsigned short secure_port;
+  char *certificate_path;
+  char *key_path;
   char *gzip_mime_types[CONFIG_MAX_GZIP_MIME_TYPES];
   int num_gzip_mime_types;
   proxy_config_t *proxies[CONFIG_MAX_PROXIES];
   int num_proxies;
+  bool ssl_enabled;
 } config_t;
 
 char *read_file(char *path);
