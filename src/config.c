@@ -77,29 +77,11 @@ void parse_config(const char *json_string, config_t *config)
   {
     config->secure_port = secure_port->valueint;
   }
-  else if(secure_port)
+  else if (secure_port)
   {
     log_fatal("secure_port in wrong format in configuration JSON!");
     cJSON_Delete(json);
     exit(1);
-  }
-
-  certificate_path = cJSON_GetObjectItemCaseSensitive(json, "certificate_path");
-  if (cJSON_IsString(certificate_path) && certificate_path->valuestring)
-  {
-    size_t len = strlen(certificate_path->valuestring);
-    config->certificate_path = malloc(len +1);
-    strcpy(config->certificate_path, certificate_path->valuestring);
-    config->certificate_path[len] = '\0';
-  }
-
-  key_path = cJSON_GetObjectItemCaseSensitive(json, "key_path");
-  if (cJSON_IsString(key_path) && key_path->valuestring)
-  {
-    size_t len = strlen(key_path->valuestring);
-    config->key_path = malloc(len +1);
-    strcpy(config->key_path, key_path->valuestring);
-    config->key_path[len] = '\0';
   }
 
   log_file = cJSON_GetObjectItemCaseSensitive(json, "log_file");
@@ -162,11 +144,40 @@ void parse_config(const char *json_string, config_t *config)
     {
       config->proxies[config->num_proxies - 1]->port = proxy_port->valueint;
     }
-  }
 
-  if(config->certificate_path && config->key_path && config->secure_port > 0)
-  {
-    config->ssl_enabled = true;
+    bool ssl_enabled = config->secure_port > 0;
+
+    certificate_path = cJSON_GetObjectItemCaseSensitive(proxy, "certificate_path");
+    if (!cJSON_IsString(certificate_path) || !certificate_path->valuestring)
+    {
+      ssl_enabled = false;
+    }
+
+    key_path = cJSON_GetObjectItemCaseSensitive(proxy, "key_path");
+    if (!cJSON_IsString(key_path) || !key_path->valuestring)
+    {
+      ssl_enabled = false;
+    }
+
+    if (ssl_enabled)
+    {
+      config->proxies[config->num_proxies - 1]->ssl_context = SSL_CTX_new(SSLv23_method());
+      if (!SSL_CTX_use_certificate_file(config->proxies[config->num_proxies - 1]->ssl_context, certificate_path->valuestring, SSL_FILETYPE_PEM))
+      {
+        log_error("Could not load certificate file: %s", certificate_path->valuestring);
+        ssl_enabled = false;
+      }
+      if (ssl_enabled && !SSL_CTX_use_PrivateKey_file(config->proxies[config->num_proxies - 1]->ssl_context, key_path->valuestring, SSL_FILETYPE_PEM))
+      {
+        log_error("Could not load key file: %s or key doesn't match certificate: %s", key_path->valuestring, certificate_path->valuestring);
+        ssl_enabled = false;
+      }
+    }
+    if (!ssl_enabled)
+    {
+      SSL_CTX_free(config->proxies[config->num_proxies - 1]->ssl_context);
+      config->proxies[config->num_proxies - 1]->ssl_context = NULL;
+    }
   }
 
   cJSON_Delete(json);

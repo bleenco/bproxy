@@ -16,6 +16,8 @@
 #include "cJSON.h"
 #include "log.h"
 
+#include "openssl/ssl.h"
+
 #define CONFIG_MAX_HOSTS 10
 #define CONFIG_MAX_GZIP_MIME_TYPES 20
 #define CONFIG_MAX_PROXIES 100
@@ -26,19 +28,17 @@ typedef struct proxy_config_t
   char *ip;
   unsigned short port;
   int num_hosts;
+  SSL_CTX *ssl_context;
 } proxy_config_t;
 
 typedef struct config_t
 {
   unsigned short port;
   unsigned short secure_port;
-  char *certificate_path;
-  char *key_path;
   char *gzip_mime_types[CONFIG_MAX_GZIP_MIME_TYPES];
   int num_gzip_mime_types;
   proxy_config_t *proxies[CONFIG_MAX_PROXIES];
   int num_proxies;
-  bool ssl_enabled;
 } config_t;
 
 char *read_file(char *path);

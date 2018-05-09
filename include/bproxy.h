@@ -53,18 +53,12 @@ typedef struct conn_s
   uv_link_t http_link;
   uv_link_observer_t observer;
 
-  SSL* ssl;
-  uv_ssl_t* ssl_link;
+  SSL *ssl;
+  uv_ssl_t *ssl_link;
 } conn_t;
 
-typedef struct proxy_ip_port
-{
-  char *ip;
-  unsigned short port;
-} proxy_ip_port;
-
 server_t *server;
-static SSL_CTX* ctx;
+static SSL_CTX *default_ctx;
 
 static void conn_init(uv_stream_t *handle);
 static void conn_free(conn_t *conn);
@@ -82,7 +76,7 @@ void link_close_cb(uv_link_t *source);
 static void shutdown_cb(uv_shutdown_t *req, int status);
 static void connection_cb(uv_stream_t *s, int status);
 
-static proxy_ip_port find_proxy_config(char *hostname);
+static proxy_config_t *find_proxy_config(const char *hostname);
 static int server_init();
 static int server_listen(unsigned short port, uv_tcp_t *tcp);
 void parse_args(int argc, char **argv);

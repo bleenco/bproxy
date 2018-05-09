@@ -15,7 +15,9 @@
   if ((V) != 0)  \
   abort()
 
-#define CHECK_ALLOC(V) if ((V) == NULL) abort()
+#define CHECK_ALLOC(V) \
+  if ((V) == NULL)     \
+  abort()
 
 static void write_link_cb(uv_link_t *source, int status, void *arg)
 {
@@ -43,8 +45,8 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
     }
     else
     {
-      proxy_ip_port ip_port = find_proxy_config(conn->http_link_context.request.hostname);
-      if (!ip_port.ip || !ip_port.port)
+      proxy_config_t *proxy_config = find_proxy_config(conn->http_link_context.request.hostname);
+      if (!proxy_config)
       {
         char *resp = malloc(1024 * sizeof(char));
         http_404_response(resp);
@@ -52,21 +54,44 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
         uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
         return;
       }
-      proxy_http_request(ip_port.ip, ip_port.port, conn);
+      proxy_http_request(proxy_config->ip, proxy_config->port, conn);
     }
   }
 
   if (nread < 0)
   {
-    uv_link_t* error_link;
+    uv_link_t *error_link;
     int err = uv_link_errno(&error_link, -nread);
-    if(err != 135170){
+    if (err != 135170)
+    {
       // If not connection closing!
-      const char* estr = uv_link_strerror((uv_link_t*)observer, nread);
+      const char *estr = uv_link_strerror((uv_link_t *)observer, nread);
       log_error("[%d]: %s", err, estr);
     }
     uv_link_close((uv_link_t *)observer, observer_connection_link_close_cb);
   }
+}
+
+static int ssl_servername_cb(SSL *s, int *ad, void *arg)
+{
+  conn_t *conn = (conn_t *)arg;
+  const char *hostname = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
+  proxy_config_t *proxy_config = find_proxy_config(hostname);
+  if (!proxy_config)
+  {
+    log_error("Unknown hostname: %s", hostname);
+    return SSL_TLSEXT_ERR_ALERT_FATAL;
+  }
+  if (proxy_config->ssl_context)
+  {
+    SSL_set_SSL_CTX(s, proxy_config->ssl_context);
+  }
+  else
+  {
+    log_error("SSL/TLS not configured properly for %s", hostname);
+    return SSL_TLSEXT_ERR_ALERT_FATAL;
+  }
+  return SSL_TLSEXT_ERR_OK;
 }
 
 void conn_init(uv_stream_t *handle)
@@ -85,7 +110,6 @@ void conn_init(uv_stream_t *handle)
   if (addr.ss_family == AF_INET)
   {
     uv_ip4_name((const struct sockaddr_in *)&addr, conn->http_link_context.peer_ip, sizeof(conn->http_link_context.peer_ip));
-    ssl_conn = ((const struct sockaddr_in *)&addr)->sin_port == server->config->secure_port;
   }
   else if (addr.ss_family == AF_INET6)
   {
@@ -110,16 +134,20 @@ void conn_init(uv_stream_t *handle)
   CHECK(uv_link_init(&conn->http_link, &http_link_methods));
   http_link_init(&conn->http_link, &conn->http_link_context, server->config);
 
-  if(ssl_conn)
+  if (ssl_conn)
   {
-    CHECK_ALLOC(conn->ssl = SSL_new(ctx));
+    CHECK_ALLOC(conn->ssl = SSL_new(default_ctx));
+    SSL_CTX_set_tlsext_servername_callback(default_ctx, ssl_servername_cb);
+    SSL_CTX_set_tlsext_servername_arg(default_ctx, conn);
     SSL_set_accept_state(conn->ssl);
     CHECK_ALLOC(conn->ssl_link =
-         uv_ssl_create(uv_default_loop(), conn->ssl, &err));
+                    uv_ssl_create(uv_default_loop(), conn->ssl, &err));
     CHECK(err);
-    CHECK(uv_link_chain((uv_link_t *)&conn->source, conn->ssl_link));
+    CHECK(uv_link_chain((uv_link_t *)&conn->source, (uv_link_t *)conn->ssl_link));
     CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
-  }else{
+  }
+  else
+  {
     CHECK(uv_link_chain((uv_link_t *)&conn->source, &conn->http_link));
   }
   CHECK(uv_link_chain((uv_link_t *)&conn->http_link, (uv_link_t *)&conn->observer));
@@ -274,10 +302,8 @@ void connection_cb(uv_stream_t *s, int status)
   conn_init(conn);
 }
 
-proxy_ip_port find_proxy_config(char *hostname)
+proxy_config_t *find_proxy_config(const char *hostname)
 {
-  proxy_ip_port ip_port = {.ip = NULL, .port = 0};
-
   for (int i = 0; i < server->config->num_proxies; i++)
   {
     proxy_config_t *pconf = server->config->proxies[i];
@@ -305,15 +331,13 @@ proxy_ip_port find_proxy_config(char *hostname)
         // If wildcard, requested hostname may be longer
         if (wildcard || i < 0)
         {
-          ip_port.ip = pconf->ip;
-          ip_port.port = pconf->port;
-          return ip_port;
+          return pconf;
         }
       }
     }
   }
 
-  return ip_port;
+  return NULL;
 }
 
 int server_listen(unsigned short port, uv_tcp_t *tcp)
@@ -340,37 +364,15 @@ int server_listen(unsigned short port, uv_tcp_t *tcp)
 
 int server_init()
 {
-  if(server->config->ssl_enabled > 0)
-  {
-    SSL_library_init();
-    OpenSSL_add_all_algorithms();
-    OpenSSL_add_all_digests();
-    SSL_load_error_strings();
-    ERR_load_crypto_strings();
-
-    /* Initialize SSL_CTX */
-    CHECK_ALLOC(ctx = SSL_CTX_new(SSLv23_method()));
-
-    if(!SSL_CTX_use_certificate_file(ctx, server->config->certificate_path, SSL_FILETYPE_PEM))
-    {
-      log_error("Could not load certificate file!");
-      server->config->ssl_enabled = false;
-    }
-    if(!SSL_CTX_use_PrivateKey_file(ctx, server->config->key_path, SSL_FILETYPE_PEM))
-    {
-      log_error("Could not load key file!");
-      server->config->ssl_enabled = false;
-    }
-
-    CHECK(uv_ssl_setup_recommended_secure_context(ctx));
-  }
-
   server->loop = uv_default_loop();
 
   server_listen(server->config->port, &server->tcp);
 
-  if(server->config->ssl_enabled)
+  if (server->config->secure_port > 0)
   {
+    // Initialize SSL_CTX
+    CHECK_ALLOC(default_ctx = SSL_CTX_new(SSLv23_method()));
+    CHECK(uv_ssl_setup_recommended_secure_context(default_ctx));
     server_listen(server->config->secure_port, &server->secure_tcp);
   }
 
@@ -430,6 +432,12 @@ void usage()
 
 int main(int argc, char **argv)
 {
+  SSL_library_init();
+  OpenSSL_add_all_algorithms();
+  OpenSSL_add_all_digests();
+  SSL_load_error_strings();
+  ERR_load_crypto_strings();
+
   server = malloc(sizeof(server_t));
   server->config = malloc(sizeof(config_t));
   parse_args(argc, argv);
