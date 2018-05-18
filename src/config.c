@@ -118,6 +118,7 @@ void parse_config(const char *json_string, config_t *config)
     config->num_proxies++;
 
     config->proxies[config->num_proxies - 1] = malloc(sizeof(proxy_config_t));
+    memset(config->proxies[config->num_proxies - 1], 0, sizeof(proxy_config_t));
     proxy_hosts = cJSON_GetObjectItemCaseSensitive(proxy, "hosts");
     config->proxies[config->num_proxies - 1]->num_hosts = 0;
     cJSON_ArrayForEach(proxy_host, proxy_hosts)
@@ -170,6 +171,14 @@ void parse_config(const char *json_string, config_t *config)
       if (ssl_enabled && !SSL_CTX_use_PrivateKey_file(config->proxies[config->num_proxies - 1]->ssl_context, key_path->valuestring, SSL_FILETYPE_PEM))
       {
         log_error("Could not load key file: %s or key doesn't match certificate: %s", key_path->valuestring, certificate_path->valuestring);
+        ssl_enabled = false;
+      }
+    }
+    if (ssl_enabled)
+    {
+      if (uv_ssl_setup_recommended_secure_context(config->proxies[config->num_proxies - 1]->ssl_context))
+      {
+        log_error("configuring recommended secure context");
         ssl_enabled = false;
       }
     }
