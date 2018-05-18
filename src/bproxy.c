@@ -60,30 +60,23 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
 
   if (nread < 0)
   {
-    uv_link_t *error_link;
-    int err = uv_link_errno(&error_link, -nread);
-    if (err != 135170)
-    {
-      // If not connection closing!
-      const char *estr = uv_link_strerror((uv_link_t *)observer, nread);
-      log_error("[%d]: %s", err, estr);
-    }
     uv_link_close((uv_link_t *)observer, observer_connection_link_close_cb);
   }
 }
 
 static int ssl_servername_cb(SSL *s, int *ad, void *arg)
 {
-  conn_t *conn = (conn_t *)arg;
   const char *hostname = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
-  if (!hostname)
+  if (!hostname || hostname[0] == '\0')
   {
-    hostname = "";
+    return SSL_TLSEXT_ERR_NOACK;
   }
   proxy_config_t *proxy_config = find_proxy_config(hostname);
   if (!proxy_config)
   {
     log_error("Unknown hostname: %s", hostname);
+    SSL_CTX *new = SSL_CTX_new(SSLv23_method());
+    SSL_set_SSL_CTX(s, new);
     return SSL_TLSEXT_ERR_ALERT_FATAL;
   }
   if (proxy_config->ssl_context)
@@ -144,8 +137,7 @@ void conn_init(uv_stream_t *handle)
     SSL_CTX_set_tlsext_servername_callback(default_ctx, ssl_servername_cb);
     SSL_CTX_set_tlsext_servername_arg(default_ctx, conn);
     SSL_set_accept_state(conn->ssl);
-    CHECK_ALLOC(conn->ssl_link =
-                    uv_ssl_create(uv_default_loop(), conn->ssl, &err));
+    CHECK_ALLOC(conn->ssl_link = uv_ssl_create(uv_default_loop(), conn->ssl, &err));
     CHECK(err);
     CHECK(uv_link_chain((uv_link_t *)&conn->source, (uv_link_t *)conn->ssl_link));
     CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
@@ -202,7 +194,7 @@ void write_cb(uv_write_t *req, int status)
 {
   if (status < 0)
   {
-    log_error("error writting to destination!");
+    log_error("error writing to destination!");
     return;
   }
   write_req_t *wr = (write_req_t *)req->data;
@@ -225,14 +217,14 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     int err = uv_link_write(&conn->http_link, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
     if (err)
     {
-      log_error("error writing to client: %s", strerror(err));
+      log_error("error writing to client: %s", uv_err_name(err));
     }
   }
   else if (nread < 0)
   {
     if (nread != UV_EOF)
     {
-      log_error("could not read from socket!");
+      log_error("could not read from socket! (%s)", uv_strerror(nread));
     }
     if (!uv_is_closing((const uv_handle_t *)handle))
     {
@@ -420,6 +412,14 @@ void parse_args(int argc, char **argv)
   }
 }
 
+static void ignore_sigpipe(void)
+{
+  struct sigaction act;
+  memset(&act, 0, sizeof(act));
+  act.sa_handler = SIG_IGN;
+  sigaction(SIGPIPE, &act, NULL);
+}
+
 void usage()
 {
   printf("bproxy v%s\n\n"
@@ -437,6 +437,7 @@ void usage()
 
 int main(int argc, char **argv)
 {
+  ignore_sigpipe();
   SSL_library_init();
   OpenSSL_add_all_algorithms();
   OpenSSL_add_all_digests();

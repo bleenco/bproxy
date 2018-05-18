@@ -9,6 +9,8 @@
         "home.local.net",
         "bterm.home.local.net"
       ],
+      "certificate_path": "test/certs/localhost2.crt",
+      "key_path": "test/certs/localhost2.key",
       "ip": "127.0.0.1",
       "port": 7500
     },
@@ -23,8 +25,8 @@
       "hosts": [
         "abstruse.home.local.net"
       ],
-      "certificate_path": "test/keys/localhost.crt",
-      "key_path": "test/keys/localhost.key",
+      "certificate_path": "test/certs/localhost.crt",
+      "key_path": "test/certs/localhost.key",
       "ip": "127.0.0.1",
       "port": 6500
     }
