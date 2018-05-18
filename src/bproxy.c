@@ -76,6 +76,10 @@ static int ssl_servername_cb(SSL *s, int *ad, void *arg)
 {
   conn_t *conn = (conn_t *)arg;
   const char *hostname = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
+  if (!hostname)
+  {
+    hostname = "";
+  }
   proxy_config_t *proxy_config = find_proxy_config(hostname);
   if (!proxy_config)
   {
@@ -412,6 +416,7 @@ void parse_args(int argc, char **argv)
   {
     char *json = read_file(server->config_file);
     parse_config(json, server->config);
+    free(json);
   }
 }
 

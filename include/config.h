@@ -17,6 +17,7 @@
 #include "log.h"
 
 #include "openssl/ssl.h"
+#include "uv_ssl_t.h"
 
 #define CONFIG_MAX_HOSTS 10
 #define CONFIG_MAX_GZIP_MIME_TYPES 20

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "node ./test/run.js",
-    "build": "gypkg build bproxy.gyp",
+    "build": "gypkg build bproxy.gyp --insecure",
     "clean": "rimraf gypkg_deps out",
     "log": "conventional-changelog -p angular -i CHANGELOG.md -s"
   },
