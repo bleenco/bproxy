@@ -20,6 +20,7 @@
 #include "config.h"
 
 #include "gzip.h"
+#include "queue.h"
 
 #define MAX_HEADERS 20
 #define MAX_ELEMENT_SIZE 500
@@ -33,10 +34,16 @@ enum header_element
   VALUE
 };
 
+typedef struct buf_queue_s{
+  uv_buf_t buf;
+  QUEUE member;
+}buf_queue_t;
+
 typedef struct http_request_s
 {
   char *raw;
   ssize_t raw_len;
+  QUEUE raw_requests;
   enum http_method method;
   char host[256];
   char *url;
@@ -51,7 +58,8 @@ typedef struct http_request_s
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
   boolean enable_compression;
   http_parser parser;
-
+  int content_length;
+  bool complete;
   char *status_line;
 } http_request_t;
 

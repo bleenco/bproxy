@@ -41,7 +41,15 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
   {
     if (conn->proxy_handle)
     {
-      write_buf((uv_stream_t *)conn->proxy_handle, buf->base, nread);
+      //write_buf((uv_stream_t *)conn->proxy_handle, buf->base, nread);
+      QUEUE *q;
+      QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+      {
+        buf_queue_t* bq = QUEUE_DATA(q, buf_queue_t, member);
+        write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
+        free(bq->buf.base);
+      }
+      http_free_raw_requests_queue(&conn->http_link_context.request);
     }
     else
     {
@@ -252,7 +260,16 @@ void proxy_connect_cb(uv_connect_t *req, int status)
 
   uv_read_start((uv_stream_t *)conn->proxy_handle, alloc_cb, proxy_read_cb);
   http_request_t *request = &conn->http_link_context.request;
-  write_buf((uv_stream_t *)conn->proxy_handle, request->raw, request->raw_len);
+  //write_buf((uv_stream_t *)conn->proxy_handle, request->raw, request->raw_len);
+  QUEUE *q;
+  QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+  {
+    buf_queue_t* bq = QUEUE_DATA(q, buf_queue_t, member);
+    write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
+    free(bq->buf.base);
+  }
+  buf_queue_t* bq3 = QUEUE_DATA(&conn->http_link_context.request.raw_requests, buf_queue_t, member);
+  http_free_raw_requests_queue(&conn->http_link_context.request);
 }
 
 void proxy_http_request(char *ip, unsigned short port, conn_t *conn)

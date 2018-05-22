@@ -16,6 +16,8 @@ void http_link_init(uv_link_t *link, http_link_context_t *context, config_t *con
 
   context->request.parser.data = context;
   context->response.parser.data = context;
+  QUEUE_INIT(&context->request.raw_requests);
+  context->request.complete = true;
 }
 
 void alloc_cb_override(uv_link_t *link,
@@ -27,6 +29,17 @@ void alloc_cb_override(uv_link_t *link,
   buf->len = suggested_size;
 }
 
+void http_free_raw_requests_queue(http_request_t* request)
+{
+  QUEUE *q;
+  while(!QUEUE_EMPTY(&request->raw_requests))
+  {
+    buf_queue_t* bq = QUEUE_DATA(QUEUE_NEXT(&request->raw_requests), buf_queue_t, member);
+    QUEUE_REMOVE(&bq->member);
+    free(bq);
+  }
+}
+
 void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
 {
   http_link_context_t *context = link->data;
@@ -35,29 +48,42 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
   {
     if (context->type == TYPE_REQUEST)
     {
-      context->initial_reply = true;
-      context->request_time = uv_hrtime();
-      time(&context->request_timestamp);
+      if(context->request.complete)
+      {
+        context->request.complete = false;
+        context->initial_reply = true;
+        context->request_time = uv_hrtime();
+        time(&context->request_timestamp);
 
-      free(context->request.raw);
-      context->request.raw = malloc(nread);
-      memcpy(context->request.raw, buf->base, nread);
-      context->request.raw_len = nread;
+        free(context->request.raw);
+        context->request.raw = malloc(nread);
+        memcpy(context->request.raw, buf->base, nread);
+        context->request.raw_len = nread;
 
-      // Parse status line
-      free(context->request.status_line);
-      int status_line_len = strchr(buf->base, '\r') - buf->base;
-      context->request.status_line = malloc(status_line_len + 1);
-      memcpy(context->request.status_line, buf->base, status_line_len);
-      context->request.status_line[status_line_len] = '\0';
+        // Parse status line
+        free(context->request.status_line);
+        // TODO: Remove this line
+        //log_debug("%s text: %.*s", __FUNCTION__, nread, buf->base);
+
+        int status_line_len = strchr(buf->base, '\r') - buf->base;
+        context->request.status_line = malloc(status_line_len + 1);
+        memcpy(context->request.status_line, buf->base, status_line_len);
+        context->request.status_line[status_line_len] = '\0';
+        http_parser_init(&context->request.parser, HTTP_REQUEST);
+
+        gzip_state_t *state = context->response.gzip_state;
+        if (state)
+        {
+          gzip_free_state(state);
+          free(state);
+          context->response.gzip_state = NULL;
+        }
+        context->response.processed_data_len = 0;
+        QUEUE_INIT(&context->request.raw_requests);
+      }
 
       size_t np = http_parser_execute(&context->request.parser, &parser_settings, buf->base,
                                       nread);
-
-      if (context->request.upgrade)
-      {
-        context->type = TYPE_WEBSOCKET;
-      }
       if (np != nread)
       {
         uv_shutdown_t *req;
@@ -68,14 +94,17 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         return;
       }
 
-      gzip_state_t *state = context->response.gzip_state;
-      if (state)
+      buf_queue_t* buf_queue_node = malloc(sizeof *buf_queue_node);
+      QUEUE_INIT(&buf_queue_node->member);
+      buf_queue_node->buf.base = malloc(nread);
+      memcpy(buf_queue_node->buf.base, buf->base, nread);
+      buf_queue_node->buf.len = nread;
+      QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_node->member);
+
+      if (context->request.upgrade && context->request.complete)
       {
-        gzip_free_state(state);
-        free(state);
-        context->response.gzip_state = NULL;
+        context->type = TYPE_WEBSOCKET;
       }
-      context->response.processed_data_len = 0;
     }
   }
   // Closing everything is observer's job, just propagate it to him
