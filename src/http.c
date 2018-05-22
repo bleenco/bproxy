@@ -60,6 +60,7 @@ int headers_complete_cb(http_parser *p)
   req->http_minor = p->http_minor;
   req->method = p->method;
   req->upgrade = p->upgrade;
+  req->content_length = p->content_length;
 
   req->enable_compression = false;
 
@@ -91,6 +92,8 @@ int body_cb(http_parser *p, const char *buf, size_t length)
 
 int message_complete_cb(http_parser *p)
 {
+  http_link_context_t *context = p->data;
+  context->request.complete = true;
   return 0;
 }
 
