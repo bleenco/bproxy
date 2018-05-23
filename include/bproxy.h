@@ -61,7 +61,7 @@ server_t *server;
 static SSL_CTX *default_ctx;
 
 static void conn_init(uv_stream_t *handle);
-static void conn_free(conn_t *conn);
+static void conn_close(conn_t *conn);
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
 static void write_buf(uv_stream_t *handle, char *data, int len);

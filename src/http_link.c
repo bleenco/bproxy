@@ -29,12 +29,12 @@ void alloc_cb_override(uv_link_t *link,
   buf->len = suggested_size;
 }
 
-void http_free_raw_requests_queue(http_request_t* request)
+void http_free_raw_requests_queue(http_request_t *request)
 {
   QUEUE *q;
-  while(!QUEUE_EMPTY(&request->raw_requests))
+  while (!QUEUE_EMPTY(&request->raw_requests))
   {
-    buf_queue_t* bq = QUEUE_DATA(QUEUE_NEXT(&request->raw_requests), buf_queue_t, member);
+    buf_queue_t *bq = QUEUE_DATA(QUEUE_NEXT(&request->raw_requests), buf_queue_t, member);
     QUEUE_REMOVE(&bq->member);
     free(bq);
   }
@@ -48,7 +48,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
   {
     if (context->type == TYPE_REQUEST)
     {
-      if(context->request.complete)
+      if (context->request.complete)
       {
         context->request.complete = false;
         context->initial_reply = true;
@@ -94,18 +94,17 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         return;
       }
 
-      buf_queue_t* buf_queue_node = malloc(sizeof *buf_queue_node);
-      QUEUE_INIT(&buf_queue_node->member);
-      buf_queue_node->buf.base = malloc(nread);
-      memcpy(buf_queue_node->buf.base, buf->base, nread);
-      buf_queue_node->buf.len = nread;
-      QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_node->member);
-
-      if (context->request.upgrade && context->request.complete)
+      if (context->request.upgrade)
       {
         context->type = TYPE_WEBSOCKET;
       }
     }
+    buf_queue_t *buf_queue_node = malloc(sizeof *buf_queue_node);
+    QUEUE_INIT(&buf_queue_node->member);
+    buf_queue_node->buf.base = malloc(nread);
+    memcpy(buf_queue_node->buf.base, buf->base, nread);
+    buf_queue_node->buf.len = nread;
+    QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_node->member);
   }
   // Closing everything is observer's job, just propagate it to him
   uv_link_propagate_read_cb(link, nread, buf);
@@ -157,7 +156,9 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
       if (response->gzip_state == NULL)
       {
         // Parse status line
-        int status_line_len = strchr(resp, '\r') - resp;
+        int status_line_len;
+        for (status_line_len = 0; status_line_len < nread && resp[status_line_len] != '\r'; ++status_line_len)
+          ;
         memcpy(response->status_line, resp, status_line_len);
         response->status_line[status_line_len] = '\0';
 

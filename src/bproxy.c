@@ -27,10 +27,12 @@ static void write_link_cb(uv_link_t *source, int status, void *arg)
 static void observer_connection_link_close_cb(uv_link_t *link)
 {
   conn_t *conn;
-
   conn = link->data;
   SSL_free(conn->ssl);
-  conn_free(conn);
+  conn->ssl = NULL;
+  free(conn->handle);
+  conn->handle = NULL;
+  conn_close(conn);
 }
 
 static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nread,
@@ -45,7 +47,7 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
       QUEUE *q;
       QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
       {
-        buf_queue_t* bq = QUEUE_DATA(q, buf_queue_t, member);
+        buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
         write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
         free(bq->buf.base);
       }
@@ -68,7 +70,7 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
 
   if (nread < 0)
   {
-    uv_link_close((uv_link_t *)observer, observer_connection_link_close_cb);
+    conn_close(conn);
   }
 }
 
@@ -161,7 +163,7 @@ void conn_init(uv_stream_t *handle)
   CHECK(uv_link_read_start((uv_link_t *)&conn->observer));
 }
 
-void conn_free(conn_t *conn)
+void conn_close(conn_t *conn)
 {
   if (conn->proxy_handle)
   {
@@ -170,8 +172,24 @@ void conn_free(conn_t *conn)
       uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
     }
   }
-  free(conn->handle);
-  free(conn);
+  if (conn->handle)
+  {
+    if (!uv_is_closing((uv_handle_t *)conn->handle))
+    {
+      uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
+    }
+  }
+  if (conn->handle == NULL && conn->proxy_handle == NULL)
+  {
+    QUEUE *q;
+    QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+    {
+      buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
+      free(bq->buf.base);
+    }
+    http_free_raw_requests_queue(&conn->http_link_context.request);
+    free(conn);
+  }
 }
 
 void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
@@ -212,7 +230,12 @@ void write_cb(uv_write_t *req, int status)
 
 void proxy_close_cb(uv_handle_t *peer)
 {
+  conn_t *conn = peer->data;
+  conn->proxy_handle = NULL;
   free(peer);
+
+  http_free_raw_requests_queue(&conn->http_link_context.request);
+  conn_close(conn);
 }
 
 void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
@@ -222,7 +245,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   if (nread > 0)
   {
     uv_buf_t tmp_buf = uv_buf_init(buf->base, nread);
-    int err = uv_link_write(&conn->http_link, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
+    int err = uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
     if (err)
     {
       log_error("error writing to client: %s", uv_err_name(err));
@@ -234,11 +257,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       log_error("could not read from socket! (%s)", uv_strerror(nread));
     }
-    if (!uv_is_closing((const uv_handle_t *)handle))
-    {
-      uv_close((uv_handle_t *)handle, proxy_close_cb);
-      conn->proxy_handle = NULL;
-    }
+    conn_close(conn);
   }
   if (nread <= 0)
   {
@@ -253,7 +272,7 @@ void proxy_connect_cb(uv_connect_t *req, int status)
 
   if (status < 0)
   {
-    uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
+    conn_close(conn);
     // TODO: write meaningful responses
     return;
   }
@@ -264,11 +283,10 @@ void proxy_connect_cb(uv_connect_t *req, int status)
   QUEUE *q;
   QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
   {
-    buf_queue_t* bq = QUEUE_DATA(q, buf_queue_t, member);
+    buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
     write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
     free(bq->buf.base);
   }
-  buf_queue_t* bq3 = QUEUE_DATA(&conn->http_link_context.request.raw_requests, buf_queue_t, member);
   http_free_raw_requests_queue(&conn->http_link_context.request);
 }
 
