@@ -34,10 +34,11 @@ enum header_element
   VALUE
 };
 
-typedef struct buf_queue_s{
+typedef struct buf_queue_s
+{
   uv_buf_t buf;
   QUEUE member;
-}buf_queue_t;
+} buf_queue_t;
 
 typedef struct http_request_s
 {
