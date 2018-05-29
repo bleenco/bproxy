@@ -68,6 +68,9 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         int status_line_len;
         for (status_line_len = 0; status_line_len < nread && buf->base[status_line_len] != '\r'; ++status_line_len)
           ;
+        if(status_line_len == nread){
+          log_warn("HTTP_PARSING (request status line): Len: %d; %.*s", nread, nread, buf->base);
+        }
         context->request.status_line = malloc(status_line_len + 1);
         memcpy(context->request.status_line, buf->base, status_line_len);
         context->request.status_line[status_line_len] = '\0';
@@ -161,6 +164,9 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
         int status_line_len;
         for (status_line_len = 0; status_line_len < nread && resp[status_line_len] != '\r'; ++status_line_len)
           ;
+        if(status_line_len == nread){
+          log_warn("HTTP_PARSING (response status line): Len: %d; %.*s", nread, nread, resp);
+        }
         memcpy(response->status_line, resp, status_line_len);
         response->status_line[status_line_len] = '\0';
 
