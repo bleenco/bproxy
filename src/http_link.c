@@ -65,7 +65,9 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         // TODO: Remove this line
         //log_debug("%s text: %.*s", __FUNCTION__, nread, buf->base);
 
-        int status_line_len = strchr(buf->base, '\r') - buf->base;
+        int status_line_len;
+        for (status_line_len = 0; status_line_len < nread && buf->base[status_line_len] != '\r'; ++status_line_len)
+          ;
         context->request.status_line = malloc(status_line_len + 1);
         memcpy(context->request.status_line, buf->base, status_line_len);
         context->request.status_line[status_line_len] = '\0';
