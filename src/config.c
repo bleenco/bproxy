@@ -163,14 +163,16 @@ void parse_config(const char *json_string, config_t *config)
     if (ssl_enabled)
     {
       config->proxies[config->num_proxies - 1]->ssl_context = SSL_CTX_new(SSLv23_method());
-      if (!SSL_CTX_use_certificate_file(config->proxies[config->num_proxies - 1]->ssl_context, certificate_path->valuestring, SSL_FILETYPE_PEM))
+      if (!SSL_CTX_use_certificate_chain_file(config->proxies[config->num_proxies - 1]->ssl_context, certificate_path->valuestring))
       {
-        log_error("Could not load certificate file: %s", certificate_path->valuestring);
+        int err = ERR_get_error();
+        log_error("Could not load certificate file: %s; reason: %s", certificate_path->valuestring, ERR_error_string(err, NULL));
         ssl_enabled = false;
       }
       if (ssl_enabled && !SSL_CTX_use_PrivateKey_file(config->proxies[config->num_proxies - 1]->ssl_context, key_path->valuestring, SSL_FILETYPE_PEM))
       {
-        log_error("Could not load key file: %s or key doesn't match certificate: %s", key_path->valuestring, certificate_path->valuestring);
+        int err = ERR_get_error();
+        log_error("Could not load key file: %s or key doesn't match certificate: %s; reason: %s", key_path->valuestring, certificate_path->valuestring, ERR_error_string(err, NULL));
         ssl_enabled = false;
       }
     }
