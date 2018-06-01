@@ -90,7 +90,7 @@ int headers_complete_cb(http_parser *p)
   // Forwarded: by=<identifier>; for=<identifier>; host=<host>; proto=<http|https>
   char *proto = context->https ? "https" : "http";
   strcpy(request->headers[request->num_headers][0], "Forwarded");
-  sprintf(request->headers[request->num_headers][1], "by=%s; for=%s; host=%s; proto=%s\r\n", "bproxy", context->peer_ip, request->host, proto);
+  sprintf(request->headers[request->num_headers][1], "by=%s; for=%s; host=%s; proto=%s", "bproxy", context->peer_ip, request->host, proto);
   ++request->num_headers;
   return 0;
 }
