@@ -169,14 +169,15 @@ void conn_close(conn_t *conn)
 {
   if (conn->proxy_handle)
   {
-    if (!uv_is_closing((uv_handle_t *)conn->proxy_handle))
+    if (!uv_is_closing((uv_handle_t *)conn->proxy_handle) && !uv_is_active((uv_handle_t *)conn->proxy_handle))
     {
       uv_close((uv_handle_t *)conn->proxy_handle, proxy_close_cb);
+      conn->proxy_handle = NULL;
     }
   }
   if (conn->handle)
   {
-    if (!uv_is_closing((uv_handle_t *)conn->handle))
+    if (!uv_is_closing((uv_handle_t *)conn->handle) && !uv_is_active((uv_handle_t *)conn->handle))
     {
       uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
     }
@@ -259,7 +260,6 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       log_error("could not read from socket! (%s)", uv_strerror(nread));
     }
-    // TODO: Fix premature closing of client connection (in case of pending writes)
     conn_close(conn);
   }
   if (nread <= 0)
