@@ -87,11 +87,18 @@ int headers_complete_cb(http_parser *p)
     }
   }
 
-  // Forwarded: by=<identifier>; for=<identifier>; host=<host>; proto=<http|https>
+  // Proxy headers
   char *proto = context->https ? "https" : "http";
-  strcpy(request->headers[request->num_headers][0], "Forwarded");
-  sprintf(request->headers[request->num_headers][1], "by=%s; for=%s; host=%s; proto=%s", "bproxy", context->peer_ip, request->host, proto);
-  ++request->num_headers;
+
+  strcpy(request->headers[request->num_headers][0], "X-Forwarded-For");
+  strcpy(request->headers[request->num_headers++][1], context->peer_ip);
+
+  strcpy(request->headers[request->num_headers][0], "X-Forwarded-Host");
+  strcpy(request->headers[request->num_headers++][1], request->host);
+
+  strcpy(request->headers[request->num_headers][0], "X-Forwarded-Proto");
+  strcpy(request->headers[request->num_headers++][1], proto);
+
   return 0;
 }
 
