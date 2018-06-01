@@ -8,3 +8,6 @@ bproxy.log
 .settings/
 .cproject
 .project
+
+*.key
+*.crt
