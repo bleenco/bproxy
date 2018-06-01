@@ -28,6 +28,7 @@
       "src/http.c",
       "src/cJSON.c",
       "src/http_link.c",
+      "src/common.c",
       "src/bproxy.c"
     ]
   }]

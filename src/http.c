@@ -9,7 +9,8 @@
 
 int message_begin_cb(http_parser *p)
 {
-  http_request_t *request = p->data;
+  http_link_context_t *context = p->data;
+  http_request_t *request = &context->request;
   for (int i = 0; i < MAX_HEADERS; i++)
   {
     request->headers[i][0][0] = 0;
@@ -24,7 +25,8 @@ int message_begin_cb(http_parser *p)
 
 int url_cb(http_parser *p, const char *buf, size_t len)
 {
-  http_request_t *request = p->data;
+  http_link_context_t *context = p->data;
+  http_request_t *request = &context->request;
   free(request->url);
   request->url = malloc((len + 1) * sizeof(char));
   memcpy(request->url, buf, len);
@@ -34,7 +36,8 @@ int url_cb(http_parser *p, const char *buf, size_t len)
 
 int headers_field_cb(http_parser *p, const char *buf, size_t len)
 {
-  http_request_t *request = p->data;
+  http_link_context_t *context = p->data;
+  http_request_t *request = &context->request;
   if (request->last_header_element != FIELD)
   {
     request->num_headers++;
@@ -46,7 +49,8 @@ int headers_field_cb(http_parser *p, const char *buf, size_t len)
 
 int headers_value_cb(http_parser *p, const char *buf, size_t len)
 {
-  http_request_t *request = p->data;
+  http_link_context_t *context = p->data;
+  http_request_t *request = &context->request;
   strncat(request->headers[request->num_headers - 1][1], buf, len);
   request->last_header_element = VALUE;
   return 0;
@@ -54,34 +58,40 @@ int headers_value_cb(http_parser *p, const char *buf, size_t len)
 
 int headers_complete_cb(http_parser *p)
 {
-  http_request_t *req = (http_request_t *)p->data;
-  req->keepalive = http_should_keep_alive(p);
-  req->http_major = p->http_major;
-  req->http_minor = p->http_minor;
-  req->method = p->method;
-  req->upgrade = p->upgrade;
-  req->content_length = p->content_length;
+  http_link_context_t *context = p->data;
+  http_request_t *request = &context->request;
+  request->keepalive = http_should_keep_alive(p);
+  request->http_major = p->http_major;
+  request->http_minor = p->http_minor;
+  request->method = p->method;
+  request->upgrade = p->upgrade;
+  request->content_length = p->content_length;
 
-  req->enable_compression = false;
+  request->enable_compression = false;
 
-  for (int i = 0; i < req->num_headers; i++)
+  for (int i = 0; i < request->num_headers; i++)
   {
-    if (strcasecmp(req->headers[i][0], "Host") == 0)
+    if (strcasecmp(request->headers[i][0], "Host") == 0)
     {
-      int nob = strlen(req->headers[i][1]);
-      memcpy(req->host, req->headers[i][1], nob);
-      req->host[nob] = '\0';
-      parse_requested_host(req);
+      int nob = strlen(request->headers[i][1]);
+      memcpy(request->host, request->headers[i][1], nob);
+      request->host[nob] = '\0';
+      parse_requested_host(request);
     }
-    else if (strcasecmp(req->headers[i][0], "Accept-Encoding") == 0)
+    else if (strcasecmp(request->headers[i][0], "Accept-Encoding") == 0)
     {
-      if (strstr(req->headers[i][1], "gzip"))
+      if (strstr(request->headers[i][1], "gzip"))
       {
-        req->enable_compression = true;
+        request->enable_compression = true;
       }
     }
   }
 
+  // Forwarded: by=<identifier>; for=<identifier>; host=<host>; proto=<http|https>
+  char *proto = context->https ? "https" : "http";
+  strcpy(request->headers[request->num_headers][0], "Forwarded");
+  sprintf(request->headers[request->num_headers][1], "by=%s; for=%s; host=%s; proto=%s\r\n", "bproxy", context->peer_ip, request->host, proto);
+  ++request->num_headers;
   return 0;
 }
 
@@ -262,27 +272,49 @@ int response_headers_complete_cb(http_parser *p)
   return 0;
 }
 
-void gzip_init_headers(http_response_t *response)
+void http_init_response_headers(http_response_t *response, bool compressed)
 {
-  gzip_state_t *state = response->gzip_state;
-  strcat(state->http_header, response->status_line);
-  strcat(state->http_header, "\r\n");
+  memset(response->http_header, 0, sizeof response->http_header);
+  strcat(response->http_header, response->status_line);
+  strcat(response->http_header, "\r\n");
   for (int i = 0; i < response->num_headers; ++i)
   {
     // Skip responses of non compressed headers
-    if (strcasecmp(response->headers[i][0], "Content-Length") == 0 || strcasecmp(response->headers[i][0], "Accept-Ranges") == 0)
+    if (compressed && (strcasecmp(response->headers[i][0], "Content-Length") == 0 || strcasecmp(response->headers[i][0], "Accept-Ranges") == 0))
     {
       continue;
     }
 
-    strcat(state->http_header, response->headers[i][0]);
-    strcat(state->http_header, ": ");
-    strcat(state->http_header, response->headers[i][1]);
-    strcat(state->http_header, "\r\n");
+    strcat(response->http_header, response->headers[i][0]);
+    strcat(response->http_header, ": ");
+    strcat(response->http_header, response->headers[i][1]);
+    strcat(response->http_header, "\r\n");
   }
-  // Add gzip headers
-  strcat(state->http_header, "Transfer-Encoding: chunked\r\n");
-  strcat(state->http_header, "Content-Encoding: gzip\r\n");
+  if (compressed)
+  {
+    // Add gzip headers
+    strcat(response->http_header, "Transfer-Encoding: chunked\r\n");
+    strcat(response->http_header, "Content-Encoding: gzip\r\n");
+  }
+  strcat(response->http_header, "Via: bproxy\r\n");
+  strcat(response->http_header, "\r\n");
+  response->http_header_len = strlen(response->http_header);
+}
 
-  strcat(state->http_header, "\r\n");
+void http_init_request_headers(http_link_context_t *context)
+{
+  http_request_t *request = &context->request;
+  memset(request->http_header, 0, sizeof request->http_header);
+  strcat(request->http_header, request->status_line);
+  strcat(request->http_header, "\r\n");
+  for (int i = 0; i < request->num_headers; ++i)
+  {
+    strcat(request->http_header, request->headers[i][0]);
+    strcat(request->http_header, ": ");
+    strcat(request->http_header, request->headers[i][1]);
+    strcat(request->http_header, "\r\n");
+  }
+
+  strcat(request->http_header, "\r\n");
+  request->http_header_len = strlen(request->http_header);
 }
