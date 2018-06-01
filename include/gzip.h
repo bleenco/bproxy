@@ -21,7 +21,7 @@ typedef struct gzip_state_t
   char *chunk_body;
 } gzip_state_t;
 
-int gzip_init_state(gzip_state_t *state);
+int gzip_init_state(gzip_state_t *state, char *http_header);
 void gzip_free_state(gzip_state_t *state);
 int gzip_compress(gzip_state_t *state);
 void gzip_chunk_compress(gzip_state_t *state);

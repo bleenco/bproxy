@@ -57,6 +57,8 @@ typedef struct http_request_s
   enum header_element last_header_element;
   int num_headers;
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
+  char http_header[MAX_HEADERS * 2 * (MAX_ELEMENT_SIZE + 2) + 256];
+  int http_header_len;
   boolean enable_compression;
   http_parser parser;
   int content_length;
@@ -76,6 +78,8 @@ typedef struct http_response_s
   enum header_element last_header_element;
   int num_headers;
   char headers[MAX_HEADERS][2][MAX_ELEMENT_SIZE];
+  char http_header[MAX_HEADERS * 2 * (MAX_ELEMENT_SIZE + 2) + 256];
+  int http_header_len;
   char status_line[256];
   boolean enable_compression;
   gzip_state_t *gzip_state;
@@ -86,15 +90,16 @@ typedef struct http_link_context_s
   http_request_t request;
   http_response_t response;
   config_t *server_config; // TODO: Move this out, and use only part of configuration needed
+  bool https;
   enum
   {
     TYPE_REQUEST,
     TYPE_WEBSOCKET
   } type;
   bool initial_reply;
+  char peer_ip[45];
 
   // Data for logging
-  char peer_ip[45];
   uint64_t request_time;
   time_t request_timestamp;
 } http_link_context_t;
@@ -118,7 +123,8 @@ void insert_substring(char *a, char *b, int position);
 char *substring(char *string, int position, int length);
 void http_404_response(char *resp);
 
-void gzip_init_headers(http_response_t *response);
+void http_init_response_headers(http_response_t *response, bool compressed);
+void http_init_request_headers(http_link_context_t *context);
 
 // clang-format off
 static http_parser_settings parser_settings =

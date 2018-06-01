@@ -1,4 +1,5 @@
 #include "http_link.h"
+#include "common.h"
 
 #define CHECK(V) \
   if ((V) != 0)  \
@@ -46,6 +47,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
 
   if (nread > 0)
   {
+    size_t http_headers_len = 0;
     if (context->type == TYPE_REQUEST)
     {
       if (context->request.complete)
@@ -61,16 +63,19 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         context->request.raw_len = nread;
 
         // Parse status line
+        size_t status_line_len;
         free(context->request.status_line);
-        // TODO: Remove this line
-        //log_debug("%s text: %.*s", __FUNCTION__, nread, buf->base);
-
-        int status_line_len;
-        for (status_line_len = 0; status_line_len < nread && buf->base[status_line_len] != '\r'; ++status_line_len)
-          ;
-        if(status_line_len == nread){
-          log_warn("HTTP_PARSING (request status line): Len: %d; %.*s", nread, nread, buf->base);
+        char *status_line_end = strnstr(buf->base, nread, "\r");
+        if (status_line_end)
+        {
+          status_line_len = status_line_end - buf->base;
         }
+        else
+        {
+          log_warn("HTTP_PARSING (request status line): Len: %d; %.*s", nread, nread, buf->base);
+          status_line_len = nread;
+        }
+
         context->request.status_line = malloc(status_line_len + 1);
         memcpy(context->request.status_line, buf->base, status_line_len);
         context->request.status_line[status_line_len] = '\0';
@@ -85,6 +90,16 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         }
         context->response.processed_data_len = 0;
         QUEUE_INIT(&context->request.raw_requests);
+
+        char *header_end = strnstr(buf->base, nread, "\r\n\r\n");
+        if (header_end)
+        {
+          http_headers_len = header_end - buf->base + 4;
+        }
+        else
+        {
+          log_warn("HTTP_PARSING: end of headers not found");
+        }
       }
 
       size_t np = http_parser_execute(&context->request.parser, &parser_settings, buf->base,
@@ -104,12 +119,25 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         context->type = TYPE_WEBSOCKET;
       }
     }
-    buf_queue_t *buf_queue_node = malloc(sizeof *buf_queue_node);
-    QUEUE_INIT(&buf_queue_node->member);
-    buf_queue_node->buf.base = malloc(nread);
-    memcpy(buf_queue_node->buf.base, buf->base, nread);
-    buf_queue_node->buf.len = nread;
-    QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_node->member);
+    // Insert head
+    if (http_headers_len)
+    {
+      http_init_request_headers(context);
+      buf_queue_t *buf_queue_header_node = malloc(sizeof *buf_queue_header_node);
+      QUEUE_INIT(&buf_queue_header_node->member);
+      buf_queue_header_node->buf.base = malloc(context->request.http_header_len);
+      memcpy(buf_queue_header_node->buf.base, context->request.http_header, context->request.http_header_len);
+      buf_queue_header_node->buf.len = context->request.http_header_len;
+      QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_header_node->member);
+    }
+    // Insert body
+    size_t body_size = nread - http_headers_len;
+    buf_queue_t *buf_queue_body_node = malloc(sizeof *buf_queue_body_node);
+    QUEUE_INIT(&buf_queue_body_node->member);
+    buf_queue_body_node->buf.base = malloc(body_size);
+    memcpy(buf_queue_body_node->buf.base, &buf->base[http_headers_len], body_size);
+    buf_queue_body_node->buf.len = body_size;
+    QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_body_node->member);
   }
   // Closing everything is observer's job, just propagate it to him
   uv_link_propagate_read_cb(link, nread, buf);
@@ -151,33 +179,43 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
 
   if (nread > 0)
   {
+    int headers_len = 0;
+    int body_len = 0;
+
     if (context->initial_reply)
     {
       http_parser_init(&response->parser, HTTP_RESPONSE);
       http_parser_execute(&response->parser, &resp_parser_settings, resp, nread);
+
+      // Parse status line
+      size_t status_line_len;
+      char* status_line_end = strnstr(resp, nread, "\r");
+      if (status_line_end)
+      {
+        status_line_len = status_line_end - resp;
+      }
+      else
+      {
+        log_warn("HTTP_PARSING (response status line): Len: %d; %.*s", nread, nread, resp);
+        status_line_len = nread;
+      }
+
+      memcpy(response->status_line, resp, status_line_len);
+      response->status_line[status_line_len] = '\0';
+      bool use_compression = context->type == TYPE_REQUEST && context->request.enable_compression && response->enable_compression;
+      http_init_response_headers(response, use_compression);
+
+      // Get body start and body length
+      headers_len = strstr(resp, "\r\n\r\n") - resp + 4; // 4 is for \r\n\r\n
+      body_len = nread - headers_len;
+      response->body_size = body_len;
     }
     if (context->type == TYPE_REQUEST && context->request.enable_compression && response->enable_compression)
     {
       if (response->gzip_state == NULL)
       {
-        // Parse status line
-        int status_line_len;
-        for (status_line_len = 0; status_line_len < nread && resp[status_line_len] != '\r'; ++status_line_len)
-          ;
-        if(status_line_len == nread){
-          log_warn("HTTP_PARSING (response status line): Len: %d; %.*s", nread, nread, resp);
-        }
-        memcpy(response->status_line, resp, status_line_len);
-        response->status_line[status_line_len] = '\0';
-
-        // Get body start and body length
-        int headers_len = strstr(resp, "\r\n\r\n") - resp + 4; // 4 is for \r\n\r\n
-        int body_len = nread - headers_len;
-        response->body_size = body_len;
-
         response->gzip_state = malloc(sizeof *response->gzip_state);
-        gzip_init_state(response->gzip_state);
-        gzip_init_headers(response);
+        gzip_init_state(response->gzip_state, response->http_header);
         if (body_len == 0)
         {
           resp_size = 0;
@@ -195,6 +233,19 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
       else // Gzip initialized
       {
         compress_data(response, resp, nread, &resp, &resp_size);
+      }
+    }
+    else
+    {
+      // Add Via header
+      if (context->initial_reply)
+      {
+        char *tmp_resp = malloc(response->http_header_len + body_len);
+        memcpy(tmp_resp, response->http_header, response->http_header_len);
+        memcpy(&tmp_resp[response->http_header_len], &resp[headers_len], body_len);
+        free(resp);
+        resp = tmp_resp;
+        resp_size = response->http_header_len + body_len;
       }
     }
 

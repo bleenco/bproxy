@@ -5,7 +5,7 @@
 #include <string.h>
 #include "stdint.h"
 
-int gzip_init_state(gzip_state_t *state)
+int gzip_init_state(gzip_state_t *state, char *http_header)
 {
   int ret_status = 0;
 
@@ -25,9 +25,7 @@ int gzip_init_state(gzip_state_t *state)
   state->raw_body = NULL;
   state->gzip_body = malloc(buf_sizes);
   state->chunk_body = malloc(buf_sizes);
-  state->http_header = malloc(buf_sizes);
-
-  memset(state->http_header, 0, buf_sizes);
+  state->http_header = http_header;
 
   state->current_size_buf_out = buf_sizes;
 
@@ -46,7 +44,6 @@ void gzip_free_state(gzip_state_t *state)
     deflateEnd(&state->strm);
     free(state->gzip_body);
     free(state->chunk_body);
-    free(state->http_header);
   }
 }
 

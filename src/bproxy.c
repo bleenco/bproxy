@@ -110,6 +110,13 @@ void conn_init(uv_stream_t *handle)
   memset(conn, 0, sizeof *conn);
   conn->handle = handle;
 
+  CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
+  conn->source.data = conn;
+
+  CHECK(uv_link_observer_init(&conn->observer));
+  CHECK(uv_link_init(&conn->http_link, &http_link_methods));
+  http_link_init(&conn->http_link, &conn->http_link_context, server->config);
+
   // Get remote address
   struct sockaddr_storage addr = {0};
   int alen = sizeof addr;
@@ -134,12 +141,7 @@ void conn_init(uv_stream_t *handle)
     ssl_conn = ntohs(((const struct sockaddr_in6 *)&addr)->sin6_port) == server->config->secure_port;
   }
 
-  CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
-  conn->source.data = conn;
-
-  CHECK(uv_link_observer_init(&conn->observer));
-  CHECK(uv_link_init(&conn->http_link, &http_link_methods));
-  http_link_init(&conn->http_link, &conn->http_link_context, server->config);
+  conn->http_link_context.https = ssl_conn;
 
   if (ssl_conn)
   {
@@ -257,6 +259,7 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       log_error("could not read from socket! (%s)", uv_strerror(nread));
     }
+    // TODO: Fix premature closing of client connection (in case of pending writes)
     conn_close(conn);
   }
   if (nread <= 0)
