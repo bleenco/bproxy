@@ -1,5 +1,7 @@
 {
   "files.associations": {
-    "ostream": "c"
+    "ostream": "c",
+    "iterator": "c",
+    "memory": "c"
   }
 }

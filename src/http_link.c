@@ -32,7 +32,6 @@ void alloc_cb_override(uv_link_t *link,
 
 void http_free_raw_requests_queue(http_request_t *request)
 {
-  QUEUE *q;
   while (!QUEUE_EMPTY(&request->raw_requests))
   {
     buf_queue_t *bq = QUEUE_DATA(QUEUE_NEXT(&request->raw_requests), buf_queue_t, member);
@@ -65,7 +64,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         // Parse status line
         size_t status_line_len;
         free(context->request.status_line);
-        char *status_line_end = strnstr(buf->base, nread, "\r");
+        char *status_line_end = strnstr_custom(buf->base, nread, "\r");
         if (status_line_end)
         {
           status_line_len = status_line_end - buf->base;
@@ -91,7 +90,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         context->response.processed_data_len = 0;
         QUEUE_INIT(&context->request.raw_requests);
 
-        char *header_end = strnstr(buf->base, nread, "\r\n\r\n");
+        char *header_end = strnstr_custom(buf->base, nread, "\r\n\r\n");
         if (header_end)
         {
           http_headers_len = header_end - buf->base + 4;
@@ -189,7 +188,7 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
 
       // Parse status line
       size_t status_line_len;
-      char* status_line_end = strnstr(resp, nread, "\r");
+      char* status_line_end = strnstr_custom(resp, nread, "\r");
       if (status_line_end)
       {
         status_line_len = status_line_end - resp;
