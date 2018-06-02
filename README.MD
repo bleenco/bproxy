@@ -2,13 +2,13 @@
   <img src="https://user-images.githubusercontent.com/1796022/39833139-8497ece0-53c9-11e8-8fc4-12517a2d303b.png" width="300px">
 </p>
 
-bproxy is lightweight super-fast minimal configuration proxy server written in C based on `libuv`.
+Bproxy is a lightweight super-fast minimal-configuration proxy server written in C.
 
 It supports `gzip` compression and `SSL` out-of-the-box.
 
-### Benchmarks versus nginx
+### Benchmarks: bproxy vs. nginx
 
-We tested simple whoami app running on Golang web server on MacBook Pro Late 2016 with 16GB memory and here are the results:
+We tested simple whoami app on Golang web server using (Wrk)[https://github.com/wg/wrk]. The tests have been performed on MacBook Pro Late 2016 with 16GB memory using following commands:
 
 1. `nginx`
 
@@ -41,9 +41,9 @@ Requests/sec:   1910.05
 Transfer/sec:    675.23KB
 ```
 
-As you can see from the results it is clearly that `nginx` handles requests with less latency but `bproxy` can handle more than twice as much requests in same period than `nginx`.
+The results suggest that `nginx` handles requests with more than 50% less latency, while `bproxy` handles more than twice as much requests in the same period.
 
-Not bad for a project that started as a hobby, right?
+When this sounds promising, feel free to use it on your server and help us improve this project further!
 
 ### Building project
 
