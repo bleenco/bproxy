@@ -182,7 +182,7 @@ void conn_close(conn_t *conn)
       uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
     }
   }
-  if (conn->handle == NULL && conn->proxy_handle == NULL)
+  if (!conn->handle && !conn->proxy_handle)
   {
     QUEUE *q;
     QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
@@ -191,7 +191,7 @@ void conn_close(conn_t *conn)
       free(bq->buf.base);
     }
     http_free_raw_requests_queue(&conn->http_link_context.request);
-    free(conn);
+    // free(conn);
   }
 }
 
@@ -251,7 +251,8 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     int err = uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
     if (err)
     {
-      log_error("error writing to client: %s", uv_err_name(err));
+      // log_error("error writing to client: %s", uv_err_name(err));
+      conn_close(conn);
     }
   }
   else if (nread < 0)
@@ -281,8 +282,8 @@ void proxy_connect_cb(uv_connect_t *req, int status)
   }
 
   uv_read_start((uv_stream_t *)conn->proxy_handle, alloc_cb, proxy_read_cb);
-  http_request_t *request = &conn->http_link_context.request;
-  //write_buf((uv_stream_t *)conn->proxy_handle, request->raw, request->raw_len);
+  // http_request_t *request = &conn->http_link_context.request;
+  // write_buf((uv_stream_t *)conn->proxy_handle, request->raw, request->raw_len);
   QUEUE *q;
   QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
   {
