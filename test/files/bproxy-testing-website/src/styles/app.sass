@@ -1,0 +1,82 @@
+@charset 'utf8'
+
+@import url('https://fonts.googleapis.com/css?family=Roboto:100,300,400,600,700')
+@import '../../node_modules/bulma/bulma'
+
+$blue: #38A2FB
+$purple: #5754A3
+$border: #EDEDED
+$grey: #D7D8D7
+$green: #93E777
+$red: #C11161
+
+$text: #74809D
+$text-light: #C0C4C7
+$border: #D2D6DA
+
+html, body
+  width: 100%
+  height: 100%
+
+body
+  background: $white
+  font-family: 'Roboto', sans-serif
+  font-size: 12px
+
+.hero
+  background: $white
+
+  .drop-container
+    background: $white
+    border-radius: 6px
+    height: 150px
+    width: 100%
+    box-shadow: 1px 2px 20px rgba($black, 0.1)
+    display: flex
+    align-items: center
+    justify-content: center
+    border: 2px dashed $text-light
+
+    p
+      font-size: 16px
+      font-weight: 400
+      color: $text-light
+
+      .upload-button
+        display: inline-block
+        border: none
+        outline: none
+        cursor: pointer
+        color: $purple
+
+        input
+          display: none
+
+  .upload-items
+    display: block
+    width: 100%
+
+    .upload-item
+      width: 100%
+      display: block
+      margin-top: 20px
+
+      .filename
+        display: block
+        padding: 0 0 5px 5px
+        color: $text
+
+      .progress
+        display: block
+        position: relative
+        width: 100%
+        height: 15px
+        border: 1px solid $purple
+        border-radius: 2px
+
+        .bar
+          position: absolute
+          top: 0
+          left: 0
+          height: 15px
+          background: $purple

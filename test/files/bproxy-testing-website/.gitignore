@@ -1,0 +1,11 @@
+dist/
+dist-app/
+bundles/
+.DS_Store
+node_modules/
+lib/
+*.ngsummary.json
+*.ngfactory.ts
+*.d.ts
+yarn.lock
+.idea/
