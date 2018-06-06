@@ -1,4 +1,4 @@
-import { writeFile, createReadStream } from 'fs';
+import { writeFile, readFileSync, readFile } from 'fs';
 import { mkdir } from 'temp';
 import * as request from 'request';
 import { createHash } from 'crypto';
@@ -45,52 +45,21 @@ export function sendRequest(url: string, opts: any = {}): Promise<request.Respon
 
 export function getFileHash(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    // the file you want to get the hash    
-    var fd = createReadStream(filePath);
-    var hash = createHash('sha1');
+    const hash = createHash('sha1');
     hash.setEncoding('hex');
-
-    fd.on('end', function () {
-      hash.end();
-      resolve(hash.read().toString());
-    });
-
-    // read all file and pipe it (write it) to the hash object
-    fd.pipe(hash);
+    hash.write(readFileSync(filePath, { encoding: 'utf8' }));
+    hash.end();
+    resolve(hash.read().toString());
   });
 }
 
-export function compareFiles(filePath1: string, filePath2: string): Promise<{same : boolean} > {
-  let hash1 : string;
-  let hash2 : string;
+export function compareFiles(filePath1: string, filePath2: string): Promise<{ same: boolean }> {
+  let hash1: string;
+  let hash2: string;
 
-  return new Promise((resolve, reject) => {
-    getFileHash(filePath1)
-      .then((h) => {
-        return new Promise((resolve, reject) => {
-          hash1 = h;
-          resolve();
-        });
-      })
-      .then(() => getFileHash(filePath2))
-      .then((h) => {
-        return new Promise((resolve, reject) => {
-          hash2 = h;
-          resolve();
-        });
-      })
-      .then(() => {
-        return new Promise((resolve, reject) => {
-          if (hash1 === hash2) {
-            resolve();
-          } else {
-            reject(new Error("Uploaded file is not same!"));
-          }
-        });
-      }).then(() => {
-        resolve();
-      }).catch((err) => {
-        reject(err);
-      });
-  });
+  return getFileHash(filePath1)
+    .then(hash => hash1 = hash)
+    .then(() => getFileHash(filePath2))
+    .then(hash => hash2 = hash)
+    .then(() => hash1 === hash2 ? { same: true } : { same: false });
 }
