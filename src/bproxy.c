@@ -247,6 +247,13 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
   if (nread > 0)
   {
+    // Set keep alive for websockets
+    if (conn->http_link_context.type == TYPE_WEBSOCKET && conn->http_link_context.initial_reply)
+    {
+      uv_tcp_keepalive((uv_tcp_t *)conn->handle, true, 0);
+      uv_tcp_keepalive((uv_tcp_t *)conn->proxy_handle, true, 0);
+    }
+
     uv_buf_t tmp_buf = uv_buf_init(buf->base, nread);
     int err = uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
     if (err)
