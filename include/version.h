@@ -8,6 +8,6 @@
 #ifndef _BPROXY_VERSION_H_
 #define _BPROXY_VERSION_H_
 
-#define VERSION "0.6.0"
+#define VERSION "0.8.0"
 
 #endif // _BPROXY_VERSION_H_
