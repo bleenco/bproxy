@@ -8,7 +8,7 @@ It supports `gzip` compression and `SSL` out-of-the-box.
 
 ### Benchmarks: bproxy vs. nginx
 
-We tested simple whoami app on Golang web server using (Wrk)[https://github.com/wg/wrk]. The tests have been performed on MacBook Pro Late 2016 with 16GB memory using following commands:
+We tested simple whoami app on Golang web server using [Wrk](https://github.com/wg/wrk). The tests have been performed on MacBook Pro Late 2016 with 16GB memory using following commands:
 
 1. `nginx`
 
