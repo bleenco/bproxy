@@ -60,7 +60,7 @@ describe('POST data', () => {
       .then(() => {
         return new Promise((resolve, reject) => {
           const dirPath = path.resolve(__dirname, '../files/randfiles/');
-          if(!fs.existsSync(dirPath)){
+          if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath);
           }
           resolve();
@@ -69,7 +69,7 @@ describe('POST data', () => {
       .then(() => {
         return new Promise((resolve, reject) => {
           const mb = platform() === 'darwin' ? 'm' : 'M';
-          const command = `dd if=/dev/urandom bs=1${mb} count=1 of=${path.resolve(__dirname, '../files/randfiles/1M.bin')}`;
+          const command = `dd if=/dev/zero bs=1 count=0 seek=1${mb} of=${path.resolve(__dirname, '../files/randfiles/1M.bin')}`;
           exec(command, (error, stdout, stderr) => {
             if (error) {
               reject(error);
@@ -82,7 +82,7 @@ describe('POST data', () => {
       .then(() => {
         return new Promise((resolve, reject) => {
           const mb = platform() === 'darwin' ? 'm' : 'M';
-          const command = `dd if=/dev/urandom bs=100${mb} count=1 of=${path.resolve(__dirname, '../files/randfiles/100M.bin')}`;
+          const command = `dd if=/dev/zero bs=1 count=0 seek=100${mb} of=${path.resolve(__dirname, '../files/randfiles/100M.bin')}`;
           exec(command, (error, stdout, stderr) => {
             if (error) {
               reject(error);
@@ -147,13 +147,13 @@ describe('POST data', () => {
             expect(savedFile[0].size).equal(1048576)
             const savedPath = savedFile[0].path;
 
-            resolve({filepath, savedPath});
+            resolve({ filepath, savedPath });
           });
           var form = req.form();
           form.append('file', fs.createReadStream(filepath));
         });
       })
-      .then(({filepath, savedPath}) => {
+      .then(({ filepath, savedPath }) => {
         return compareFiles(filepath, savedPath);
       });
   });
@@ -168,21 +168,21 @@ describe('POST data', () => {
       .then(res => {
         return new Promise((resolve, reject) => {
           const filepath = path.resolve(__dirname, '../files/randfiles/100M.bin');
-          var req = request.post('https://localhost:8081/upload', { strictSSL: false }, function (error, response, body) {
+          const req = request.post('https://localhost:8081/upload', { strictSSL: false }, function (error, response, body) {
             if (error) {
               reject(error);
             }
-            const savedFile = JSON.parse(response.body);
-            expect(savedFile[0].size).equal(33554431)
-            const savedPath = savedFile[0].path;
 
-            resolve({filepath, savedPath});
+            const savedFile = JSON.parse(response.body);
+            expect(savedFile[0].size).to.be.equal(104857600);
+            const savedPath = savedFile[0].path;
+            resolve({ filepath, savedPath });
           });
-          var form = req.form();
+          const form = req.form();
           form.append('file', fs.createReadStream(filepath));
         });
       })
-      .then(({filepath, savedPath}) => {
+      .then(({ filepath, savedPath }) => {
         return compareFiles(filepath, savedPath);
       });
   });
