@@ -303,7 +303,7 @@ void http_init_response_headers(http_response_t *response, bool compressed)
     strcat(response->http_header, "Transfer-Encoding: chunked\r\n");
     strcat(response->http_header, "Content-Encoding: gzip\r\n");
   }
-  char *name_and_version = malloc(sizeof(char) * 100);
+  char name_and_version[100];
   sprintf(name_and_version, "Via: bproxy %s\r\n\r\n", VERSION);
   strcat(response->http_header, name_and_version);
   response->http_header_len = strlen(response->http_header);
