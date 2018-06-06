@@ -278,23 +278,27 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 void proxy_connect_cb(uv_connect_t *req, int status)
 {
   conn_t *conn = req->handle->data;
+  QUEUE *q;
   free(req);
 
   if (status < 0)
   {
+    QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+    {
+      buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
+      free(bq->buf.base);
+    }
+    http_free_raw_requests_queue(&conn->http_link_context.request);
     conn_close(conn);
+    return;
     // TODO: write meaningful responses
   }
 
   uv_read_start((uv_stream_t *)conn->proxy_handle, alloc_cb, proxy_read_cb);
-  QUEUE *q;
   QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
   {
     buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
-    if (status >= 0)
-    {
-      write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
-    }
+    write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
     free(bq->buf.base);
   }
   http_free_raw_requests_queue(&conn->http_link_context.request);
