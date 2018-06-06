@@ -9,5 +9,7 @@ bproxy.log
 .cproject
 .project
 
+# Test files
 *.key
 *.crt
+test/files/randfiles/*
