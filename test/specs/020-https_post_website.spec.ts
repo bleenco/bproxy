@@ -7,6 +7,7 @@ import * as request from 'request';
 import { exec } from 'child_process';
 import * as fs from 'fs';
 import { resolve } from 'url';
+import { platform } from 'os';
 
 chai.use(chaiAsPromised);
 chai.use(require('chai-http'));
@@ -67,7 +68,8 @@ describe('POST data', () => {
       })
       .then(() => {
         return new Promise((resolve, reject) => {
-          const command = `dd if=/dev/urandom bs=1M count=1 of=${path.resolve(__dirname, '../files/randfiles/1M.bin')}`;
+          const mb = platform() === 'darwin' ? 'm' : 'M';
+          const command = `dd if=/dev/urandom bs=1${mb} count=1 of=${path.resolve(__dirname, '../files/randfiles/1M.bin')}`;
           exec(command, (error, stdout, stderr) => {
             if (error) {
               reject(error);
@@ -79,7 +81,8 @@ describe('POST data', () => {
       })
       .then(() => {
         return new Promise((resolve, reject) => {
-          const command = `dd if=/dev/urandom bs=100M count=1 of=${path.resolve(__dirname, '../files/randfiles/100M.bin')}`;
+          const mb = platform() === 'darwin' ? 'm' : 'M';
+          const command = `dd if=/dev/urandom bs=100${mb} count=1 of=${path.resolve(__dirname, '../files/randfiles/100M.bin')}`;
           exec(command, (error, stdout, stderr) => {
             if (error) {
               reject(error);
