@@ -4,7 +4,7 @@ import * as path from 'path';
 import { execSilent, killAll, runNode } from '../utils/process';
 
 const specFiles = glob.sync(path.resolve(__dirname, '../specs/*.spec.*'));
-const mo = new Mocha({ timeout: 10000, reporter: 'spec' });
+const mo = new Mocha({ timeout: 100000, reporter: 'spec' });
 
 Promise.resolve()
   .then(() => execSilent('npm',  ['run', 'build']))

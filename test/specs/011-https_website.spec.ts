@@ -31,11 +31,15 @@ describe('HTTPS Website', () => {
   before(() => {
     return Promise.resolve()
       .then(() => {
-        const command = `/bin/bash ${path.resolve(__dirname, '../certs/make_certs.sh')}`;
-        exec(command, (error, stdout, stderr) => {
-          if (error !== null) {
-            return Promise.reject(error);
-          }
+        return new Promise((resolve, reject) => {
+          const command = `/bin/bash ${path.resolve(__dirname, '../certs/make_certs.sh')}`;
+          exec(command, (error, stdout, stderr) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve();
+            }
+          });
         });
       });
   })
