@@ -289,9 +289,11 @@ void proxy_connect_cb(uv_connect_t *req, int status)
       free(bq->buf.base);
     }
     http_free_raw_requests_queue(&conn->http_link_context.request);
-    conn_close(conn);
+    char *resp = malloc(1024 * sizeof(char));
+    http_502_response(resp);
+    uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
+    uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, write_link_cb, resp);
     return;
-    // TODO: write meaningful responses
   }
 
   uv_read_start((uv_stream_t *)conn->proxy_handle, alloc_cb, proxy_read_cb);
