@@ -122,6 +122,7 @@ int insert_header(char *src, char *resp);
 void insert_substring(char *a, char *b, int position);
 char *substring(char *string, int position, int length);
 void http_404_response(char *resp);
+void http_502_response(char *resp);
 
 void http_init_response_headers(http_response_t *response, bool compressed);
 void http_init_request_headers(http_link_context_t *context);

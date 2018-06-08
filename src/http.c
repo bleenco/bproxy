@@ -204,6 +204,28 @@ void http_404_response(char *resp)
            VERSION, VERSION);
 }
 
+void http_502_response(char *resp)
+{
+  snprintf(resp, 1024,
+           "HTTP/1.1 502 Bad Gateway\r\n"
+           "Content-Length: 167\r\n"
+           "Content-Type: text/html\r\n"
+           "Connection: Close\r\n"
+           "Server: vex/%s\r\n"
+           "\r\n"
+           "<html>\r\n"
+           "<head>\r\n"
+           "<title>502 Bad Gateway</title>\r\n"
+           "</head>\r\n"
+           "<body>\r\n"
+           "<h1 align=\"center\">502 Bad Gateway</h1>\r\n"
+           "<hr/>\r\n"
+           "<p align=\"center\">bproxy %s</p>\r\n"
+           "</body>\r\n"
+           "</html>\r\n",
+           VERSION, VERSION);
+}
+
 int response_message_begin_cb(http_parser *p)
 {
   http_link_context_t *context = p->data;
