@@ -174,6 +174,20 @@ describe('Website', () => {
       });
   });
 
+  it(`should return 502 response when there is no server listening on port 65535 (http://localhost:8080)`, () => {
+    return tempDir()
+      .then(dir => configPath = path.join(dir, 'bproxy.json'))
+      .then(() => config.proxies[0].port = 65535)
+      .then(() => writeConfig(configPath, config))
+      .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => sendRequest('http://localhost:8080'))
+      .then(res => {
+        const resp = res.toJSON();
+        expect(resp.statusCode).to.equal(502);
+        expect(resp.body).to.contains('502 Bad Gateway');
+      });
+  });
+
   it(`should return 404 response when there is no "proxies" entry in config file (http://localhost:8080)`, () => {
     return tempDir()
       .then(dir => configPath = path.join(dir, 'bproxy.json'))
