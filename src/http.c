@@ -182,6 +182,28 @@ char *substring(char *string, int position, int length)
   return pointer;
 }
 
+void http_400_response(char *resp)
+{
+  snprintf(resp, 1024,
+           "HTTP/1.1 400 Bad Request\r\n"
+           "Content-Length: 165\r\n"
+           "Content-Type: text/html\r\n"
+           "Connection: Close\r\n"
+           "Server: vex/%s\r\n"
+           "\r\n"
+           "<html>\r\n"
+           "<head>\r\n"
+           "<title>400 Bad Request</title>\r\n"
+           "</head>\r\n"
+           "<body>\r\n"
+           "<h1 align=\"center\">400 Bad Request</h1>\r\n"
+           "<hr/>\r\n"
+           "<p align=\"center\">bproxy %s</p>\r\n"
+           "</body>\r\n"
+           "</html>\r\n",
+           VERSION, VERSION);
+}
+
 void http_404_response(char *resp)
 {
   snprintf(resp, 1024,
