@@ -108,7 +108,6 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         uv_shutdown_t *req;
         req = (uv_shutdown_t *)malloc(sizeof *req);
         log_error("Http parsing failed");
-        // TODO: send back error 400 Bad Request in observer
         uv_link_propagate_read_cb(link, -400, buf);
         return;
       }
