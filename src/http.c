@@ -186,7 +186,7 @@ void http_400_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 400 Bad Request\r\n"
-           "Content-Length: %\r\n"
+           "Content-Length: %d\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "Server: vex/%s\r\n"
@@ -201,7 +201,7 @@ void http_400_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           160 + strlen(VERSION), VERSION, VERSION);
+           162 + strlen(VERSION), VERSION, VERSION);
 }
 
 void http_404_response(char *resp)
