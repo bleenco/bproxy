@@ -70,7 +70,17 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
 
   if (nread < 0)
   {
-    conn_close(conn);
+    if (nread == -400)
+    {
+      char *resp = malloc(1024 * sizeof(char));
+      http_400_response(resp);
+      uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
+      uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
+    }
+    else
+    {
+      conn_close(conn);
+    }
   }
 }
 
