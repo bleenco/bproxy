@@ -4,6 +4,7 @@ import { bproxy, runNode, killAll } from '../utils/process';
 import { writeConfig, tempDir, sendRequest } from '../utils/helpers';
 import * as path from 'path';
 import * as request from 'request';
+import * as turbo from 'turbo-net';
 
 chai.use(chaiAsPromised);
 chai.use(require('chai-http'));
@@ -87,7 +88,7 @@ describe('Website', () => {
         return new Promise((resolve, reject) => {
           let len = 0;
 
-          request.get('http://localhost:8080/js/app.bundle.js', { gzip: true }, function(error, response, body) {
+          request.get('http://localhost:8080/js/app.bundle.js', { gzip: true }, function (error, response, body) {
             if (error) {
               reject(error);
             }
@@ -97,7 +98,7 @@ describe('Website', () => {
             expect(len).to.be.lessThan(100000);
             resolve();
           })
-          .on('response', response => response.on('data', data => len += data.length));
+            .on('response', response => response.on('data', data => len += data.length));
         });
       });
   });
@@ -112,7 +113,7 @@ describe('Website', () => {
         return new Promise((resolve, reject) => {
           let len = 0;
 
-          request.get('http://localhost:8080/js/app.bundle.js', { gzip: true }, function(error, response, body) {
+          request.get('http://localhost:8080/js/app.bundle.js', { gzip: true }, function (error, response, body) {
             if (error) {
               reject(error);
             }
@@ -121,7 +122,7 @@ describe('Website', () => {
             expect(len).to.be.greaterThan(100000);
             resolve();
           })
-          .on('response', response => response.on('data', data => len += data.length));
+            .on('response', response => response.on('data', data => len += data.length));
         });
       });
   });
@@ -136,7 +137,7 @@ describe('Website', () => {
         return new Promise((resolve, reject) => {
           let len = 0;
 
-          request.get('http://localhost:8080/css/app.css', { gzip: true }, function(error, response, body) {
+          request.get('http://localhost:8080/css/app.css', { gzip: true }, function (error, response, body) {
             if (error) {
               reject(error);
             }
@@ -145,7 +146,7 @@ describe('Website', () => {
             expect(len).to.be.equal(58);
             resolve();
           })
-          .on('response', response => response.on('data', data => len += data.length));
+            .on('response', response => response.on('data', data => len += data.length));
         });
       });
   });
@@ -160,7 +161,7 @@ describe('Website', () => {
         return new Promise((resolve, reject) => {
           let len = 0;
 
-          request.get('http://localhost:8080/css/app.css', { gzip: true }, function(error, response, body) {
+          request.get('http://localhost:8080/css/app.css', { gzip: true }, function (error, response, body) {
             if (error) {
               reject(error);
             }
@@ -169,7 +170,61 @@ describe('Website', () => {
             expect(len).to.not.equal(58);
             resolve();
           })
-          .on('response', response => response.on('data', data => len += data.length));
+            .on('response', response => response.on('data', data => len += data.length));
+        });
+      });
+  });
+
+  it(`Should return 400 for hello world (http://localhost:8080/)`, () => {
+    return tempDir()
+      .then(dir => configPath = path.join(dir, 'bproxy.json'))
+      .then(() => config.gzip_mime_types = [])
+      .then(() => writeConfig(configPath, config))
+      .then(() => bproxy(false, ['-c', configPath]))
+      .then(res => {
+        return new Promise((resolve, reject) => {
+
+          const socket = turbo.connect(8080)
+
+          socket.read(Buffer.alloc(1024), function (err, buf, read) {
+            if (err) throw err
+            const response = buf.toString('utf-8', 0, read);
+            if (response.includes("400 Bad Request")) {
+              resolve();
+            } else {
+              reject(new Error("Not returning 400"));
+            }
+          })
+          socket.write(Buffer.from('hello world\n'))
+        });
+      });
+  });
+
+  it(`Should return 400 for malformed header (http://localhost:8080/)`, () => {
+    return tempDir()
+      .then(dir => configPath = path.join(dir, 'bproxy.json'))
+      .then(() => config.gzip_mime_types = [])
+      .then(() => writeConfig(configPath, config))
+      .then(() => bproxy(false, ['-c', configPath]))
+      .then(res => {
+        return new Promise((resolve, reject) => {
+
+          const socket = turbo.connect(8080)
+
+          socket.read(Buffer.alloc(1024), function (err, buf, read) {
+            if (err) throw err
+            const response = buf.toString('utf-8', 0, read);
+            if (response.includes("400 Bad Request")) {
+              resolve();
+            } else {
+              reject(new Error("Not returning 400"));
+            }
+          })
+          socket.write(Buffer.from(
+            'GET / HTTP/1.1\r\n'
+            + 'Host: localhost:8083 \r\n'
+            + 'Dummy;:header \r\n\r\n'
+          ));
         });
       });
   });
