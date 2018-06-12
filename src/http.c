@@ -186,7 +186,7 @@ void http_400_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 400 Bad Request\r\n"
-           "Content-Length: 165\r\n"
+           "Content-Length: %\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "Server: vex/%s\r\n"
@@ -201,14 +201,14 @@ void http_400_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           VERSION, VERSION);
+           160 + strlen(VERSION), VERSION, VERSION);
 }
 
 void http_404_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 404 Not Found\r\n"
-           "Content-Length: 161\r\n"
+           "Content-Length: %d\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "Server: vex/%s\r\n"
@@ -223,14 +223,14 @@ void http_404_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           VERSION, VERSION);
+           156 + strlen(VERSION), VERSION, VERSION);
 }
 
 void http_502_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 502 Bad Gateway\r\n"
-           "Content-Length: 167\r\n"
+           "Content-Length: %d\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "Server: vex/%s\r\n"
@@ -245,7 +245,7 @@ void http_502_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           VERSION, VERSION);
+           162 + strlen(VERSION), VERSION, VERSION);
 }
 
 int response_message_begin_cb(http_parser *p)
