@@ -94,10 +94,13 @@ static int ssl_servername_cb(SSL *s, int *ad, void *arg)
   proxy_config_t *proxy_config = find_proxy_config(hostname);
   if (!proxy_config)
   {
-    log_error("Unknown hostname: %s", hostname);
-    SSL_CTX *new = SSL_CTX_new(SSLv23_method());
-    SSL_set_SSL_CTX(s, new);
-    return SSL_TLSEXT_ERR_ALERT_FATAL;
+    // use default SSL context
+    proxy_config_t *pconf = server->config->proxies[0];
+    if (pconf->ssl_context)
+    {
+      SSL_set_SSL_CTX(s, pconf->ssl_context);
+      return SSL_TLSEXT_ERR_OK;
+    }
   }
   if (proxy_config->ssl_context)
   {
