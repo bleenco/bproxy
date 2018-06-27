@@ -1,7 +1,7 @@
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
 import { bproxy, runNode, killAll } from '../utils/process';
-import { writeConfig, tempDir, sendRequest, getFileHash, compareFiles } from '../utils/helpers';
+import { writeConfig, tempDir, delay, compareFiles } from '../utils/helpers';
 import * as path from 'path';
 import * as request from 'request';
 import { exec } from 'child_process';
@@ -91,17 +91,19 @@ describe('POST data', () => {
             }
           });
         });
-      });
+      })
+      .catch(err => console.error(err));
   });
 
   beforeEach(() => {
     return Promise.resolve()
       .then(() => process.chdir(path.resolve(cwd, 'test/files')))
       .then(() => runNode(false, ['./bproxy-testing-website/dist-app/api/index.js']))
-      .then(() => process.chdir(cwd));
+      .then(() => process.chdir(cwd))
+      .catch(err => console.error(err));
   });
 
-  afterEach(() => killAll());
+  afterEach(() => killAll().catch(err => console.error(err)));
 
   it(`should return POST data in JSON form (https://localhost:8081/simple-form)`, () => {
     return tempDir()
@@ -109,6 +111,7 @@ describe('POST data', () => {
       .then(() => config.gzip_mime_types = [])
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           let len = 0;
@@ -127,7 +130,8 @@ describe('POST data', () => {
           })
             .on('response', response => response.on('data', data => len += data.length));
         });
-      });
+      })
+      .catch(err => console.error(err));
   });
 
   it(`should upload 1MB file (https://localhost:8081/upload)`, () => {
@@ -136,6 +140,7 @@ describe('POST data', () => {
       .then(() => config.gzip_mime_types = [])
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           const filepath = path.resolve(__dirname, '../files/randfiles/1M.bin');
@@ -155,7 +160,8 @@ describe('POST data', () => {
       })
       .then(({ filepath, savedPath }) => {
         return compareFiles(filepath, savedPath);
-      });
+      })
+      .catch(err => console.error(err));
   });
 
 
@@ -165,6 +171,7 @@ describe('POST data', () => {
       .then(() => config.gzip_mime_types = [])
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           const filepath = path.resolve(__dirname, '../files/randfiles/100M.bin');
@@ -184,6 +191,7 @@ describe('POST data', () => {
       })
       .then(({ filepath, savedPath }) => {
         return compareFiles(filepath, savedPath);
-      });
+      })
+      .catch(err => console.error(err));
   });
 });

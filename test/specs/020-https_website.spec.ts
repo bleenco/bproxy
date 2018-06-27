@@ -1,7 +1,7 @@
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
 import { bproxy, runNode, killAll } from '../utils/process';
-import { writeConfig, tempDir, sendRequest } from '../utils/helpers';
+import { writeConfig, tempDir, sendRequest, delay } from '../utils/helpers';
 import * as path from 'path';
 import * as request from 'request';
 import { exec } from 'child_process';
@@ -47,7 +47,8 @@ describe('HTTPS Website', () => {
     return Promise.resolve()
       .then(() => process.chdir(path.resolve(cwd, 'test/files')))
       .then(() => runNode(false, ['./dist/server.js']))
-      .then(() => process.chdir(cwd));
+      .then(() => process.chdir(cwd))
+      .catch(err => console.error(err));;
   })
   afterEach(() => killAll());
 
@@ -56,13 +57,15 @@ describe('HTTPS Website', () => {
       .then(dir => configPath = path.join(dir, 'bproxy.json'))
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(() => sendRequest('https://localhost:8081/', { strictSSL: false }))
       .then(resp => {
         expect(resp).to.have.status(200);
         expect(resp).to.be.html;
         expect(resp).to.not.redirect;
         expect(resp.body).to.contains('App Works!');
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should listen on port specified in configuration (https://localhost:11220)`, () => {
@@ -71,13 +74,15 @@ describe('HTTPS Website', () => {
       .then(() => config.secure_port = 11220)
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(() => sendRequest('https://localhost:11220/', { strictSSL: false }))
       .then(resp => {
         expect(resp).to.have.status(200);
         expect(resp).to.be.html;
         expect(resp).to.not.redirect;
         expect(resp.body).to.contains('App Works!');
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should return non-gzipped response (https://localhost:8081/js/app.bundle.js)`, () => {
@@ -86,13 +91,15 @@ describe('HTTPS Website', () => {
       .then(() => config.secure_port = 8081)
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(() => sendRequest('https://localhost:8081/js/app.bundle.js', { strictSSL: false }))
       .then(res => {
         const resp = res.toJSON();
         expect(resp.statusCode).to.equal(200);
         expect(resp.headers['content-type']).to.includes('application/javascript');
         expect(resp.body.length).to.be.greaterThan(100000);
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should return gzipped response (https://localhost:8081/js/app.bundle.js)`, () => {
@@ -101,6 +108,7 @@ describe('HTTPS Website', () => {
       .then(() => config.secure_port = 8081)
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           let len = 0;
@@ -117,7 +125,8 @@ describe('HTTPS Website', () => {
           })
             .on('response', response => response.on('data', data => len += data.length));
         });
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should not return gzipped response for when mime type is not listed in config file (https://localhost:8081/js/app.bundle.js)`, () => {
@@ -126,6 +135,7 @@ describe('HTTPS Website', () => {
       .then(() => config.gzip_mime_types = [])
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           let len = 0;
@@ -141,7 +151,8 @@ describe('HTTPS Website', () => {
           })
             .on('response', response => response.on('data', data => len += data.length));
         });
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should return gzipped response for mime type ["text/css"] setted in config file (https://localhost:8081/css/app.css)`, () => {
@@ -150,6 +161,7 @@ describe('HTTPS Website', () => {
       .then(() => config.gzip_mime_types = ["text/css"])
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           let len = 0;
@@ -165,7 +177,8 @@ describe('HTTPS Website', () => {
           })
             .on('response', response => response.on('data', data => len += data.length));
         });
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should not return gzipped response for css when mime type is not setted in config file (https://localhost:8081/css/app.css)`, () => {
@@ -174,6 +187,7 @@ describe('HTTPS Website', () => {
       .then(() => config.gzip_mime_types = [])
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(res => {
         return new Promise((resolve, reject) => {
           let len = 0;
@@ -189,7 +203,8 @@ describe('HTTPS Website', () => {
           })
             .on('response', response => response.on('data', data => len += data.length));
         });
-      });
+      })
+      .catch(err => console.error(err));;
   });
 
   it(`should hang up connection when there is no "proxies" entry in config file (https://localhost:8081)`, () => {
@@ -198,6 +213,7 @@ describe('HTTPS Website', () => {
       .then(() => delete config.proxies)
       .then(() => writeConfig(configPath, config))
       .then(() => bproxy(false, ['-c', configPath]))
+      .then(() => delay(500))
       .then(() => new Promise((resolve, reject) => {
         const url = 'https://localhost:8081/css/app.css';
         const options = Object.assign({}, { url }, { strictSSL: false });
@@ -212,7 +228,8 @@ describe('HTTPS Website', () => {
             reject();
           }
         });
-      }));
+      }))
+      .catch(err => console.error(err));;
   });
 
 });
