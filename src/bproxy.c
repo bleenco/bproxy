@@ -94,22 +94,18 @@ static int ssl_servername_cb(SSL *s, int *ad, void *arg)
   proxy_config_t *proxy_config = find_proxy_config(hostname);
   if (!proxy_config)
   {
-    // use default SSL context
-    proxy_config_t *pconf = server->config->proxies[0];
-    if (pconf->ssl_context)
-    {
-      SSL_set_SSL_CTX(s, pconf->ssl_context);
-      return SSL_TLSEXT_ERR_OK;
-    }
+    SSL_set_SSL_CTX(s, default_ctx);
+    return SSL_TLSEXT_ERR_NOACK;
   }
-  if (proxy_config->ssl_context)
+  if (proxy_config && proxy_config->ssl_context)
   {
     SSL_set_SSL_CTX(s, proxy_config->ssl_context);
   }
   else
   {
-    log_error("SSL/TLS not configured properly for %s", hostname);
-    return SSL_TLSEXT_ERR_ALERT_FATAL;
+    log_error("SSL/TLS not configured properly for: %s", hostname);
+    SSL_set_SSL_CTX(s, default_ctx);
+    return SSL_TLSEXT_ERR_OK;
   }
   return SSL_TLSEXT_ERR_OK;
 }
@@ -267,10 +263,10 @@ void proxy_read_cb(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     }
 
     uv_buf_t tmp_buf = uv_buf_init(buf->base, nread);
-    int err = uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, http_write_link_cb, buf->base);
+    int err = uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, write_link_cb, buf->base);
     if (err)
     {
-      // log_error("error writing to client: %s", uv_err_name(err));
+      log_error("error writing to client: %s", uv_err_name(err));
       conn_close(conn);
     }
   }
@@ -362,6 +358,36 @@ void connection_cb(uv_stream_t *s, int status)
   conn_init(conn);
 }
 
+EVP_PKEY *generatePrivateKey()
+{
+  EVP_PKEY *pkey = NULL;
+  EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+  EVP_PKEY_keygen_init(pctx);
+  EVP_PKEY_CTX_set_rsa_keygen_bits(pctx, 2048);
+  EVP_PKEY_keygen(pctx, &pkey);
+  return pkey;
+}
+
+X509 *generateCertificate(EVP_PKEY *pkey)
+{
+  X509 *x509 = X509_new();
+  X509_set_version(x509, 2);
+  ASN1_INTEGER_set(X509_get_serialNumber(x509), 0);
+  X509_gmtime_adj(X509_get_notBefore(x509), 0);
+  X509_gmtime_adj(X509_get_notAfter(x509), (long)60 * 60 * 24 * 365);
+  X509_set_pubkey(x509, pkey);
+
+  X509_NAME *name = X509_get_subject_name(x509);
+  X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (const unsigned char *)"SI", -1, -1, 0);
+  X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (const unsigned char *)"localhost", -1, -1, 0);
+  X509_NAME_add_entry_by_txt(name, "distinguished_name", MBSTRING_ASC, (const unsigned char *)"dn", -1, -1, 0);
+  X509_NAME_add_entry_by_txt(name, "keyUsage", MBSTRING_ASC, (const unsigned char *)"digitalSignature", -1, -1, 0);
+  X509_NAME_add_entry_by_txt(name, "extendedKeyUsage", MBSTRING_ASC, (const unsigned char *)"serverAuth", -1, -1, 0);
+  X509_set_issuer_name(x509, name);
+  X509_sign(x509, pkey, EVP_sha256());
+  return x509;
+}
+
 proxy_config_t *find_proxy_config(const char *hostname)
 {
   for (int i = 0; i < server->config->num_proxies; i++)
@@ -433,6 +459,19 @@ int server_init()
     // Initialize SSL_CTX
     CHECK_ALLOC(default_ctx = SSL_CTX_new(SSLv23_method()));
     CHECK(uv_ssl_setup_recommended_secure_context(default_ctx));
+
+    EVP_PKEY *pkey = generatePrivateKey();
+    X509 *x509 = generateCertificate(pkey);
+
+    SSL_CTX_use_certificate(default_ctx, x509);
+    SSL_CTX_use_PrivateKey(default_ctx, pkey);
+
+    RSA *rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
+    SSL_CTX_set_tmp_rsa(default_ctx, rsa);
+    RSA_free(rsa);
+
+    SSL_CTX_set_verify(default_ctx, SSL_VERIFY_NONE, 0);
+
     server_listen(server->config->secure_port, &server->secure_tcp);
   }
 

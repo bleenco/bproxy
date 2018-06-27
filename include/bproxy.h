@@ -76,6 +76,9 @@ void link_close_cb(uv_link_t *source);
 static void shutdown_cb(uv_shutdown_t *req, int status);
 static void connection_cb(uv_stream_t *s, int status);
 
+EVP_PKEY *generatePrivateKey();
+X509 *generateCertificate(EVP_PKEY *pkey);
+
 static proxy_config_t *find_proxy_config(const char *hostname);
 static int server_init();
 static int server_listen(unsigned short port, uv_tcp_t *tcp);

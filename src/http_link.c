@@ -71,7 +71,6 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         }
         else
         {
-          log_warn("HTTP_PARSING (request status line): Len: %d; %.*s", nread, nread, buf->base);
           status_line_len = nread;
         }
 
@@ -94,10 +93,6 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         if (header_end)
         {
           http_headers_len = header_end - buf->base + 4;
-        }
-        else
-        {
-          log_warn("HTTP_PARSING: end of headers not found");
         }
       }
 
