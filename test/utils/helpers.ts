@@ -63,3 +63,7 @@ export function compareFiles(filePath1: string, filePath2: string): Promise<{ sa
     .then(hash => hash2 = hash)
     .then(() => hash1 === hash2 ? { same: true } : { same: false });
 }
+
+export function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(() => resolve(), ms));
+}
