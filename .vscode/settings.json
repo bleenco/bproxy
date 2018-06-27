@@ -2,6 +2,7 @@
   "files.associations": {
     "ostream": "c",
     "iterator": "c",
-    "memory": "c"
+    "memory": "c",
+    "__locale": "c"
   }
 }
