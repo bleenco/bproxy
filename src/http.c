@@ -141,7 +141,7 @@ int insert_header(char *src, char *resp)
   const char *find = strstr(resp, "\r\n\r\n") + 3;
   if (find)
   {
-    int pos = (int)find - (int)resp;
+    int pos = (int)(find - resp);
     insert_substring(resp, src, pos);
     return 1;
   }
@@ -186,7 +186,7 @@ void http_400_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 400 Bad Request\r\n"
-           "Content-Length: %d\r\n"
+           "Content-Length: %ld\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "\r\n"
@@ -200,14 +200,14 @@ void http_400_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           162 + strlen(VERSION), VERSION, VERSION);
+           162 + strlen(VERSION), VERSION);
 }
 
 void http_404_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 404 Not Found\r\n"
-           "Content-Length: %d\r\n"
+           "Content-Length: %ld\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "\r\n"
@@ -221,14 +221,14 @@ void http_404_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           156 + strlen(VERSION), VERSION, VERSION);
+           156 + strlen(VERSION), VERSION);
 }
 
 void http_502_response(char *resp)
 {
   snprintf(resp, 1024,
            "HTTP/1.1 502 Bad Gateway\r\n"
-           "Content-Length: %d\r\n"
+           "Content-Length: %ld\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
            "Server: vex/%s\r\n"
