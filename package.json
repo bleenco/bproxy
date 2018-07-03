@@ -18,9 +18,7 @@
     "url": "https://github.com/bleenco/bproxy.git"
   },
   "dependencies": {
-    "gypkg": "^2.7.7",
-    "rimraf": "^2.6.2",
-    "turbo-net": "^1.4.0"
+    "gypkg": "^2.7.7"
   },
   "devDependencies": {
     "@types/chai": "^4.1.2",
@@ -36,8 +34,10 @@
     "glob": "^7.1.2",
     "mocha": "^5.1.0",
     "request": "^2.85.0",
+    "rimraf": "^2.6.2",
     "temp": "^0.8.3",
     "tree-kill": "^1.2.0",
+    "turbo-net": "^1.4.0",
     "typescript": "^2.8.1"
   }
 }
