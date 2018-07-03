@@ -1,0 +1,14 @@
+{
+  "name": "openssl",
+  "version": "1.2.10",
+  "private": true,
+  "keywords": [],
+  "scripts": {
+    "test": "gypkg build"
+  },
+  "author": "Fedor Indutny <fedor@indutny.com>",
+  "license": "MIT",
+  "dependencies": {
+    "gypkg": "^2.3.0"
+  }
+}

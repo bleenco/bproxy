@@ -1,10 +1,10 @@
 {
   "variables": {
     "gypkg_deps": [
-      "git://github.com/libuv/libuv.git@^v1.x => uv.gyp:libuv",
-      "git://github.com/indutny/uv_link_t@v1.0.5 => uv_link_t.gyp:uv_link_t",
-      "git://github.com/martinopresnik/uv_ssl_t => uv_ssl_t.gyp:uv_ssl_t",
-      "git://github.com/gypkg/openssl@~1.2.10  => openssl.gyp:openssl",
+      "3rdparty/libuv => uv.gyp:libuv",
+      "3rdparty/uv_link_t => uv_link_t.gyp:uv_link_t",
+      "3rdparty/uv_ssl_t => uv_ssl_t.gyp:uv_ssl_t",
+      "3rdparty/openssl  => openssl.gyp:openssl",
       "3rdparty/zlib => gyp/zlib.gyp:zlib"
     ]
   },

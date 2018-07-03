@@ -1,0 +1,14 @@
+{
+  "name": "ringbuffer",
+  "version": "1.0.2",
+  "private": true,
+  "keywords": [],
+  "scripts": {
+    "test": "gypkg build && ./out/Release/ringbuffer-test"
+  },
+  "author": "Fedor Indutny <fedor@indutny.com>",
+  "license": "MIT",
+  "dependencies": {
+    "gypkg": "^2.3.0"
+  }
+}

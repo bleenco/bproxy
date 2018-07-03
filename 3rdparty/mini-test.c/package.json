@@ -1,0 +1,28 @@
+{
+  "name": "mini-test.c",
+  "version": "1.1.1",
+  "description": "Minimalistic portable test runner for C projects",
+  "main": "index.js",
+  "scripts": {
+    "build": "gypkg build mini-test.gyp",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/indutny/mini-test.c.git"
+  },
+  "keywords": [
+    "mini",
+    "test",
+    "C"
+  ],
+  "author": "Fedor Indutny <fedor@indutny.com> (http://darksi.de/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/indutny/mini-test.c/issues"
+  },
+  "homepage": "https://github.com/indutny/mini-test.c#readme",
+  "dependencies": {
+    "gypkg": "^2.7.7"
+  }
+}

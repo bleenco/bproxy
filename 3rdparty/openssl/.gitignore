@@ -1,0 +1,5 @@
+out/
+build/
+*.xcodeproj
+openssl.target.mk
+node_modules/

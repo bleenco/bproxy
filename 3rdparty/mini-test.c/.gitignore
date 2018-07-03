@@ -1,0 +1,4 @@
+node_modules/
+gypkg_deps/
+out/
+npm-debug.log

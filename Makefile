@@ -7,7 +7,7 @@ install:
 	cp out/Release/bproxy /usr/local/bin/bproxy
 
 clean:
-	@rm -rf out/
+	@rm -rf out/ gypkg_deps/ build/
 
 distclean:
 	@rm -rf out/ gypkg_deps/
