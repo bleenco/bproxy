@@ -7,6 +7,13 @@
  */
 #include "http.h"
 
+#define APPEND_STRING(d, s) do { \
+  size_t len = strlen(s); \
+  memcpy((d), (s), len); \
+  (d) = (d) + len; \
+  (*d) = '\0'; \
+} while(0); \
+
 int message_begin_cb(http_parser *p)
 {
   http_link_context_t *context = p->data;
@@ -318,14 +325,15 @@ int response_headers_complete_cb(http_parser *p)
   {
     response->enable_compression = false;
   }
-  return 0;
+  return -1;
 }
 
 void http_init_response_headers(http_response_t *response, bool compressed)
 {
-  memset(response->http_header, 0, sizeof response->http_header);
-  strcat(response->http_header, response->status_line);
-  strcat(response->http_header, "\r\n");
+  response->http_header[0] = '\0';
+  char* c = response->http_header;
+  APPEND_STRING(c, response->status_line);
+  APPEND_STRING(c, "\r\n");
   for (int i = 0; i < response->num_headers; ++i)
   {
     // Skip responses of non compressed headers
@@ -334,37 +342,40 @@ void http_init_response_headers(http_response_t *response, bool compressed)
       continue;
     }
 
-    strcat(response->http_header, response->headers[i][0]);
-    strcat(response->http_header, ": ");
-    strcat(response->http_header, response->headers[i][1]);
-    strcat(response->http_header, "\r\n");
+    APPEND_STRING(c, response->headers[i][0]);
+    APPEND_STRING(c, ": ");
+    APPEND_STRING(c, response->headers[i][1]);
+    APPEND_STRING(c, "\r\n");
   }
   if (compressed)
   {
     // Add gzip headers
-    strcat(response->http_header, "Transfer-Encoding: chunked\r\n");
-    strcat(response->http_header, "Content-Encoding: gzip\r\n");
+    APPEND_STRING(c, "Transfer-Encoding: chunked\r\n");
+    APPEND_STRING(c, "Content-Encoding: gzip\r\n");
   }
   char name_and_version[100];
   sprintf(name_and_version, "Via: bproxy %s\r\n\r\n", VERSION);
-  strcat(response->http_header, name_and_version);
+  APPEND_STRING(c, name_and_version);
   response->http_header_len = strlen(response->http_header);
 }
 
 void http_init_request_headers(http_link_context_t *context)
 {
   http_request_t *request = &context->request;
-  memset(request->http_header, 0, sizeof request->http_header);
-  strcat(request->http_header, request->status_line);
-  strcat(request->http_header, "\r\n");
+  request->http_header[0] = '\0';
+  char* c = request->http_header;
+
+  APPEND_STRING(c, request->status_line);
+  APPEND_STRING(c, "\r\n");
   for (int i = 0; i < request->num_headers; ++i)
   {
-    strcat(request->http_header, request->headers[i][0]);
-    strcat(request->http_header, ": ");
-    strcat(request->http_header, request->headers[i][1]);
-    strcat(request->http_header, "\r\n");
+    APPEND_STRING(c, request->headers[i][0]);
+    APPEND_STRING(c, ": ");
+    APPEND_STRING(c, request->headers[i][1]);
+    APPEND_STRING(c, "\r\n");
   }
 
-  strcat(request->http_header, "\r\n");
+  APPEND_STRING(c, "\r\n");
   request->http_header_len = strlen(request->http_header);
 }
+

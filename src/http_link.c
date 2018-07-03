@@ -56,9 +56,6 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         context->request_time = uv_hrtime();
         time(&context->request_timestamp);
 
-        free(context->request.raw);
-        context->request.raw = malloc(nread);
-        memcpy(context->request.raw, buf->base, nread);
         context->request.raw_len = nread;
 
         // Parse status line
@@ -276,7 +273,6 @@ void http_link_close(uv_link_t *link, uv_link_t *source, uv_link_close_cb cb)
 
   gzip_free_state(response->gzip_state);
   free(response->gzip_state);
-  free(context->request.raw);
   context->request.raw_len = 0;
   free(context->response.raw_body);
   free(context->request.status_line);

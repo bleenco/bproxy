@@ -42,7 +42,6 @@ typedef struct buf_queue_s
 
 typedef struct http_request_s
 {
-  char *raw;
   ssize_t raw_len;
   QUEUE raw_requests;
   enum http_method method;
@@ -145,7 +144,6 @@ static http_parser_settings resp_parser_settings =
   .on_header_field = response_headers_field_cb,
   .on_header_value = response_headers_value_cb,
   .on_headers_complete = response_headers_complete_cb,
-  .on_body = body_cb
 };
 // clang-format on
 
