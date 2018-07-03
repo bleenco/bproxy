@@ -1,10 +1,16 @@
-<p align="center" style="padding: 0 0 50px 0;">
+<div align="center">
+  <br/>
+  <br/>
   <img src="https://user-images.githubusercontent.com/1796022/39833139-8497ece0-53c9-11e8-8fc4-12517a2d303b.png" width="300px">
-</p>
+  <br/>
+  <br/>
+</div>
 
-Bproxy is a lightweight super-fast minimal-configuration proxy server written in C.
+[![AbstruseCI](https://ci.bleenco.io/badge/15)](https://ci.bleenco.io/repo/15)
 
-It supports `gzip` compression and `SSL` out-of-the-box.
+Bproxy is a lightweight **super-fast** **minimal-configuration** proxy server written in C.
+
+> It supports `gzip` compression and `SSL` out-of-the-box.
 
 ### Benchmarks: bproxy vs. nginx
 
@@ -84,6 +90,34 @@ or
 $ ./bproxy -c /path/to/bproxy-config.json
 ```
 
+### Sample configuration
+
+```json
+{
+  "port": 80,
+  "secure_port": 443,
+  "gzip_mime_types": ["text/css", "application/javascript", "application/x-javascript"],
+  "log_file": "bproxy.log",
+  "proxies": [
+    {
+      "hosts": [
+        "bleenco.io",
+        "www.bleenco.io"
+      ],
+      "certificate_path": "certs/bleenco.io.crt",
+      "key_path": "certs/bleenco.io.key",
+      "ip": "127.0.0.1",
+      "port": 7500
+    },
+    {
+      "hosts": ["*.bleenco.io"],
+      "ip": "127.0.0.1",
+      "port": 4550
+    }
+  ]
+}
+```
+
 ### Building Docker Image
 
 ```sh
@@ -106,6 +140,32 @@ $ docker run -it --name bproxy --net host -v ~/path/to/bproxy.json:/bproxy/bprox
 $ npm install
 $ npm test
 ```
+
+### Bproxy Team
+
+<div align="center">
+  <table>
+    <tbody>
+      <tr>
+        <td align="center" valign="top">
+          <img width="150" height="150" src="https://github.com/martinopresnik.png?s=150">
+          <br>
+          <a href="https://github.com/martinopresnik">Martin Opresnik</a>
+        </td>
+        <td align="center" valign="top">
+          <img width="150" height="150" src="https://github.com/jkuri.png?s=150">
+          <br>
+          <a href="https://github.com/jkuri">Jan Kuri</a>
+        </td>
+        <td align="center" valign="top">
+          <img width="150" height="150" src="https://github.com/irmana.png?s=150">
+          <br>
+          <a href="https://github.com/irmana">Irman Abdic</a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 ### LICENSE
 
