@@ -24,6 +24,14 @@ static void write_link_cb(uv_link_t *source, int status, void *arg)
   free(arg);
 }
 
+static void observer_connection_link_shutdown_cb(uv_link_t *source, int status, void *arg)
+{
+  conn_t *conn;
+  conn = source->data;
+  conn->handle_flushed = true;
+  conn_close(conn);
+}
+
 static void observer_connection_link_close_cb(uv_link_t *link)
 {
   conn_t *conn;
@@ -185,9 +193,16 @@ void conn_close(conn_t *conn)
   }
   if (conn->handle)
   {
-    if (!uv_is_closing((uv_handle_t *)conn->handle) && !uv_is_active((uv_handle_t *)conn->handle))
+    if (!uv_is_closing((uv_handle_t *)conn->handle))
     {
-      uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
+      if (!conn->handle_flushed)
+      {
+        uv_link_shutdown((uv_link_t *)&conn->observer, observer_connection_link_shutdown_cb, NULL);
+      }
+      else
+      {
+        uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
+      }
     }
   }
   if (!conn->handle && !conn->proxy_handle)
