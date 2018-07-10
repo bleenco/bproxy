@@ -284,6 +284,7 @@ void http_link_close(uv_link_t *link, uv_link_t *source, uv_link_close_cb cb)
 uv_link_methods_t http_link_methods = {
     .read_start = uv_link_default_read_start,
     .read_stop = uv_link_default_read_stop,
+    .shutdown = uv_link_default_shutdown,
     .close = http_link_close,
     .write = http_link_write,
 
