@@ -185,11 +185,6 @@ void parse_config(const char *json_string, config_t *config)
         ssl_enabled = false;
       }
     }
-    if (!ssl_enabled)
-    {
-      SSL_CTX_free(config->proxies[config->num_proxies - 1]->ssl_context);
-      config->proxies[config->num_proxies - 1]->ssl_context = NULL;
-    }
 
     ssl_passtrough = cJSON_GetObjectItemCaseSensitive(proxy, "ssl_passtrough");
     if (cJSON_IsBool(ssl_passtrough))
@@ -200,6 +195,12 @@ void parse_config(const char *json_string, config_t *config)
         ssl_enabled = false;
       }
       config->proxies[config->num_proxies - 1]->ssl_passtrough = ssl_passtrough->type == cJSON_True;
+    }
+
+    if (!ssl_enabled)
+    {
+      SSL_CTX_free(config->proxies[config->num_proxies - 1]->ssl_context);
+      config->proxies[config->num_proxies - 1]->ssl_context = NULL;
     }
   }
 

@@ -7,12 +7,14 @@
  */
 #include "http.h"
 
-#define APPEND_STRING(d, s) do { \
-  size_t len = strlen(s); \
-  memcpy((d), (s), len); \
-  (d) = (d) + len; \
-  (*d) = '\0'; \
-} while(0); \
+#define APPEND_STRING(d, s) \
+  do                        \
+  {                         \
+    size_t len = strlen(s); \
+    memcpy((d), (s), len);  \
+    (d) = (d) + len;        \
+    (*d) = '\0';            \
+  } while (0);
 
 int message_begin_cb(http_parser *p)
 {
@@ -189,6 +191,34 @@ char *substring(char *string, int position, int length)
   return pointer;
 }
 
+void http_301_response(char *resp, const http_request_t *request, unsigned short port)
+{
+  char new_url[3072];
+  snprintf(new_url, 1024,
+           "https://%s:%d%s",
+           request->hostname,
+           port,
+           request->url);
+  snprintf(resp, 4096,
+           "HTTP/1.1 301 Moved Permanently\r\n"
+           "Content-Length: %ld\r\n"
+           "Content-Type: text/html\r\n"
+           "Location: %s\r\n"
+           "Connection: Close\r\n"
+           "\r\n"
+           "<html>\r\n"
+           "<head>\r\n"
+           "<title>301 Moved Permanently</title>\r\n"
+           "</head>\r\n"
+           "<body>\r\n"
+           "<h1 align=\"center\">301 Moved Permanently</h1>\r\n"
+           "<hr/>\r\n"
+           "<p align=\"center\">bproxy %s</p>\r\n"
+           "</body>\r\n"
+           "</html>\r\n",
+           168 + strlen(VERSION), new_url, VERSION);
+}
+
 void http_400_response(char *resp)
 {
   snprintf(resp, 1024,
@@ -331,7 +361,7 @@ int response_headers_complete_cb(http_parser *p)
 void http_init_response_headers(http_response_t *response, bool compressed)
 {
   response->http_header[0] = '\0';
-  char* c = response->http_header;
+  char *c = response->http_header;
   APPEND_STRING(c, response->status_line);
   APPEND_STRING(c, "\r\n");
   for (int i = 0; i < response->num_headers; ++i)
@@ -363,7 +393,7 @@ void http_init_request_headers(http_link_context_t *context)
 {
   http_request_t *request = &context->request;
   request->http_header[0] = '\0';
-  char* c = request->http_header;
+  char *c = request->http_header;
 
   APPEND_STRING(c, request->status_line);
   APPEND_STRING(c, "\r\n");
@@ -378,4 +408,3 @@ void http_init_request_headers(http_link_context_t *context)
   APPEND_STRING(c, "\r\n");
   request->http_header_len = strlen(request->http_header);
 }
-

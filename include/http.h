@@ -119,6 +119,7 @@ void parse_requested_host(http_request_t *request);
 int insert_header(char *src, char *resp);
 void insert_substring(char *a, char *b, int position);
 char *substring(char *string, int position, int length);
+void http_301_response(char *resp, const http_request_t *request, unsigned short port);
 void http_400_response(char *resp);
 void http_404_response(char *resp);
 void http_502_response(char *resp);

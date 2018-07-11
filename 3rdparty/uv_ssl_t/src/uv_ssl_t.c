@@ -164,9 +164,8 @@ int uv_ssl_cycle(uv_ssl_t* s) {
     err = uv_ssl_cycle_output(s);
   if(s->cancel)
   {
-    uv_link_propagate_read_cb((uv_link_t*) s, s->initial_buf.len, &s->initial_buf);
-    s->initial_buf.base = NULL;
-    s->initial_buf.len = 0;
+    //uv_link_propagate_read_cb((uv_link_t*) s, s->initial_buf.len, &s->initial_buf);
+
 
     // Unlink and destroy self and link neighbors
     uv_link_t* child = s->child;
@@ -174,6 +173,10 @@ int uv_ssl_cycle(uv_ssl_t* s) {
     uv_link_unchain((uv_link_t*)s, s->child);
     uv_link_unchain(s->parent, (uv_link_t*)s);
     uv_link_chain(parent, child);
+    uv_link_propagate_read_cb(parent, s->initial_buf.len, &s->initial_buf);
+
+    s->initial_buf.base = NULL;
+    s->initial_buf.len = 0;
     uv_ssl_destroy(s, (uv_link_t*)s, do_nothing_close_cb);
   }
 
