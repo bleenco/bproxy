@@ -48,6 +48,8 @@ struct uv_ssl_s {
     ringbuffer input;
     ringbuffer output;
   } encrypted;
+  uv_buf_t initial_buf;
+  bool cancel;
 };
 
 struct uv_ssl_write_req_s {
