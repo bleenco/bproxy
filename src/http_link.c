@@ -107,7 +107,7 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
     }
     // Insert body
     size_t body_size = nread - http_headers_len;
-    if(body_size > 0)
+    if (body_size > 0)
     {
       uv_buf_t tmp_buf = uv_buf_init(malloc(body_size), body_size);
       memcpy(tmp_buf.base, &buf->base[http_headers_len], body_size);
@@ -165,7 +165,7 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[], u
 
       // Parse status line
       size_t status_line_len;
-      char* status_line_end = strnstr_custom(resp, nread, "\r");
+      char *status_line_end = strnstr_custom(resp, nread, "\r");
       if (status_line_end)
       {
         status_line_len = status_line_end - resp;
