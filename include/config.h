@@ -31,7 +31,7 @@ typedef struct proxy_config_t
   unsigned short port;
   int num_hosts;
   SSL_CTX *ssl_context;
-  bool ssl_passtrough;
+  bool ssl_passthrough;
 } proxy_config_t;
 
 typedef struct config_t
