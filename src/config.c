@@ -192,9 +192,9 @@ void parse_config(const char *json_string, config_t *config)
     }
 
     ssl_passtrough = cJSON_GetObjectItemCaseSensitive(proxy, "ssl_passtrough");
-    if(cJSON_IsBool(ssl_passtrough))
+    if (cJSON_IsBool(ssl_passtrough))
     {
-      if(ssl_enabled)
+      if (ssl_enabled)
       {
         log_warn("ssl_passtrough enabled, certificate and key file will be ignored!");
         ssl_enabled = false;

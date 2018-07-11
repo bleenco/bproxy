@@ -43,8 +43,7 @@ static void observer_connection_link_close_cb(uv_link_t *link)
   conn_close(conn);
 }
 
-
-void free_raw_requests_queue(conn_t* conn)
+void free_raw_requests_queue(conn_t *conn)
 {
   while (!QUEUE_EMPTY(&conn->raw_requests))
   {
@@ -129,14 +128,14 @@ static int ssl_servername_cb(SSL *s, int *ad, void *arg)
   {
     SSL_set_SSL_CTX(s, proxy_config->ssl_context);
   }
-  else if(proxy_config && proxy_config->ssl_passtrough)
+  else if (proxy_config && proxy_config->ssl_passtrough)
   {
-    conn_t* conn = arg;
+    conn_t *conn = arg;
     strcpy(conn->http_link_context.request.hostname, hostname);
 
-    uv_link_unchain((uv_link_t*)conn->ssl_link, &conn->http_link);
-    uv_link_unchain(&conn->http_link, (uv_link_t*)&conn->observer);
-    uv_link_chain((uv_link_t*)conn->ssl_link, (uv_link_t*)&conn->observer);
+    uv_link_unchain((uv_link_t *)conn->ssl_link, &conn->http_link);
+    uv_link_unchain(&conn->http_link, (uv_link_t *)&conn->observer);
+    uv_link_chain((uv_link_t *)conn->ssl_link, (uv_link_t *)&conn->observer);
 
     uv_ssl_cancel(conn->ssl_link);
   }
@@ -200,7 +199,7 @@ void conn_init(uv_stream_t *handle)
     SSL_set_accept_state(conn->ssl);
     CHECK_ALLOC(conn->ssl_link = uv_ssl_create(uv_default_loop(), conn->ssl, &err));
     CHECK(err);
-    ((uv_link_t*)conn->ssl_link)->data = conn;
+    ((uv_link_t *)conn->ssl_link)->data = conn;
     CHECK(uv_link_chain((uv_link_t *)&conn->source, (uv_link_t *)conn->ssl_link));
     CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
   }
@@ -347,10 +346,11 @@ void proxy_connect_cb(uv_connect_t *req, int status)
     }
     free_raw_requests_queue(conn);
     char *resp = malloc(1024 * sizeof(char));
-    if(conn->config->ssl_passtrough)
+    if (conn->config->ssl_passtrough)
     {
       conn_close(conn);
-    }else
+    }
+    else
     {
       http_502_response(resp);
       uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
