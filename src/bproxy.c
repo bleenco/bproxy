@@ -91,6 +91,7 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
         uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
         return;
       }
+      conn->config = proxy_config;
       proxy_http_request(proxy_config->ip, proxy_config->port, conn);
     }
   }
@@ -346,9 +347,15 @@ void proxy_connect_cb(uv_connect_t *req, int status)
     }
     free_raw_requests_queue(conn);
     char *resp = malloc(1024 * sizeof(char));
-    http_502_response(resp);
-    uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
-    uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, write_link_cb, resp);
+    if(conn->config->ssl_passtrough)
+    {
+      conn_close(conn);
+    }else
+    {
+      http_502_response(resp);
+      uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
+      uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, write_link_cb, resp);
+    }
     return;
   }
 
