@@ -45,6 +45,7 @@ typedef struct server_t
 
 typedef struct conn_s
 {
+  proxy_config_t* config;
   uv_stream_t *handle;
   bool handle_flushed;
   uv_tcp_t *proxy_handle;
