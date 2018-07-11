@@ -90,6 +90,14 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
         uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
         return;
       }
+      else if (proxy_config->ssl_passtrough && !conn->http_link_context.https)
+      {
+        char *resp = malloc(4096 * sizeof(char));
+        http_301_response(resp, &conn->http_link_context.request, server->config->secure_port);
+        uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
+        uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
+        return;
+      }
       conn->config = proxy_config;
       proxy_http_request(proxy_config->ip, proxy_config->port, conn);
     }
