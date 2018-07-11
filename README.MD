@@ -112,12 +112,13 @@ $ ./bproxy -c /path/to/bproxy-config.json
     {
       "hosts": ["*.bleenco.io"],
       "ip": "127.0.0.1",
-      "port": 4550
+      "port": 4550,
+      "ssl_passthrough": true
     }
   ]
 }
 ```
-
+`ssl_passthrough` property enables proxying SSL/TLS servers. That means data is not decrypted or parsed, but is just forwarded to server and vice-versa. This also enables redirection from http to https.
 ### Building Docker Image
 
 ```sh
