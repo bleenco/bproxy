@@ -49,6 +49,7 @@ typedef struct conn_s
   bool handle_flushed;
   uv_tcp_t *proxy_handle;
   http_link_context_t http_link_context;
+  QUEUE raw_requests;
 
   uv_link_source_t source;
   uv_link_t http_link;

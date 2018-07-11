@@ -17,7 +17,6 @@ void http_link_init(uv_link_t *link, http_link_context_t *context, config_t *con
 
   context->request.parser.data = context;
   context->response.parser.data = context;
-  QUEUE_INIT(&context->request.raw_requests);
   context->request.complete = true;
 }
 
@@ -28,16 +27,6 @@ void alloc_cb_override(uv_link_t *link,
   buf->base = malloc(suggested_size);
   assert(buf->base != NULL);
   buf->len = suggested_size;
-}
-
-void http_free_raw_requests_queue(http_request_t *request)
-{
-  while (!QUEUE_EMPTY(&request->raw_requests))
-  {
-    buf_queue_t *bq = QUEUE_DATA(QUEUE_NEXT(&request->raw_requests), buf_queue_t, member);
-    QUEUE_REMOVE(&bq->member);
-    free(bq);
-  }
 }
 
 void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
@@ -84,7 +73,6 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
           context->response.gzip_state = NULL;
         }
         context->response.processed_data_len = 0;
-        QUEUE_INIT(&context->request.raw_requests);
 
         char *header_end = strnstr_custom(buf->base, nread, "\r\n\r\n");
         if (header_end)
@@ -113,21 +101,19 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
     if (http_headers_len)
     {
       http_init_request_headers(context);
-      buf_queue_t *buf_queue_header_node = malloc(sizeof *buf_queue_header_node);
-      QUEUE_INIT(&buf_queue_header_node->member);
-      buf_queue_header_node->buf.base = malloc(context->request.http_header_len);
-      memcpy(buf_queue_header_node->buf.base, context->request.http_header, context->request.http_header_len);
-      buf_queue_header_node->buf.len = context->request.http_header_len;
-      QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_header_node->member);
+      uv_buf_t tmp_buf = uv_buf_init(malloc(context->request.http_header_len), context->request.http_header_len);
+      memcpy(tmp_buf.base, context->request.http_header, context->request.http_header_len);
+      uv_link_propagate_read_cb(link, context->request.http_header_len, &tmp_buf);
     }
     // Insert body
     size_t body_size = nread - http_headers_len;
-    buf_queue_t *buf_queue_body_node = malloc(sizeof *buf_queue_body_node);
-    QUEUE_INIT(&buf_queue_body_node->member);
-    buf_queue_body_node->buf.base = malloc(body_size);
-    memcpy(buf_queue_body_node->buf.base, &buf->base[http_headers_len], body_size);
-    buf_queue_body_node->buf.len = body_size;
-    QUEUE_INSERT_TAIL(&context->request.raw_requests, &buf_queue_body_node->member);
+    if(body_size > 0)
+    {
+      uv_buf_t tmp_buf = uv_buf_init(malloc(body_size), body_size);
+      memcpy(tmp_buf.base, &buf->base[http_headers_len], body_size);
+      uv_link_propagate_read_cb(link, body_size, &tmp_buf);
+    }
+    nread = 0;
   }
   // Closing everything is observer's job, just propagate it to him
   uv_link_propagate_read_cb(link, nread, buf);

@@ -43,7 +43,6 @@ typedef struct buf_queue_s
 typedef struct http_request_s
 {
   ssize_t raw_len;
-  QUEUE raw_requests;
   enum http_method method;
   char host[256];
   char *url;
