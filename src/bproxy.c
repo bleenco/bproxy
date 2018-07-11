@@ -43,23 +43,42 @@ static void observer_connection_link_close_cb(uv_link_t *link)
   conn_close(conn);
 }
 
+
+void free_raw_requests_queue(conn_t* conn)
+{
+  while (!QUEUE_EMPTY(&conn->raw_requests))
+  {
+    buf_queue_t *bq = QUEUE_DATA(QUEUE_NEXT(&conn->raw_requests), buf_queue_t, member);
+    QUEUE_REMOVE(&bq->member);
+    free(bq);
+  }
+}
+
 static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nread,
                                         const uv_buf_t *buf)
 {
   conn_t *conn = (conn_t *)observer->data;
   if (nread > 0)
   {
+    // TODO: Remove observer and add bproxy link. Current observer implementation free-s memory after reading.
+    // But memory should be free-d only after error (nread < 0) to prevent buffer copying
+    buf_queue_t *buf_queue_body_node = malloc(sizeof *buf_queue_body_node);
+    buf_queue_body_node->buf = uv_buf_init(malloc(nread), nread);
+    memcpy(buf_queue_body_node->buf.base, buf->base, nread);
+    QUEUE_INIT(&buf_queue_body_node->member);
+    QUEUE_INSERT_TAIL(&conn->raw_requests, &buf_queue_body_node->member);
+
     if (conn->proxy_handle)
     {
       //write_buf((uv_stream_t *)conn->proxy_handle, buf->base, nread);
       QUEUE *q;
-      QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+      QUEUE_FOREACH(q, &conn->raw_requests)
       {
         buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
         write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
         free(bq->buf.base);
       }
-      http_free_raw_requests_queue(&conn->http_link_context.request);
+      free_raw_requests_queue(conn);
     }
     else
     {
@@ -126,6 +145,8 @@ void conn_init(uv_stream_t *handle)
   conn_t *conn = malloc(sizeof(conn_t));
   memset(conn, 0, sizeof *conn);
   conn->handle = handle;
+
+  QUEUE_INIT(&conn->raw_requests);
 
   CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
   conn->source.data = conn;
@@ -208,12 +229,12 @@ void conn_close(conn_t *conn)
   if (!conn->handle && !conn->proxy_handle)
   {
     QUEUE *q;
-    QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+    QUEUE_FOREACH(q, &conn->raw_requests)
     {
       buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
       free(bq->buf.base);
     }
-    http_free_raw_requests_queue(&conn->http_link_context.request);
+    free_raw_requests_queue(conn);
     free(conn);
   }
 }
@@ -260,7 +281,7 @@ void proxy_close_cb(uv_handle_t *peer)
   conn->proxy_handle = NULL;
   free(peer);
 
-  http_free_raw_requests_queue(&conn->http_link_context.request);
+  free_raw_requests_queue(conn);
   conn_close(conn);
 }
 
@@ -307,12 +328,12 @@ void proxy_connect_cb(uv_connect_t *req, int status)
 
   if (status < 0)
   {
-    QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+    QUEUE_FOREACH(q, &conn->raw_requests)
     {
       buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
       free(bq->buf.base);
     }
-    http_free_raw_requests_queue(&conn->http_link_context.request);
+    free_raw_requests_queue(conn);
     char *resp = malloc(1024 * sizeof(char));
     http_502_response(resp);
     uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
@@ -321,13 +342,13 @@ void proxy_connect_cb(uv_connect_t *req, int status)
   }
 
   uv_read_start((uv_stream_t *)conn->proxy_handle, alloc_cb, proxy_read_cb);
-  QUEUE_FOREACH(q, &conn->http_link_context.request.raw_requests)
+  QUEUE_FOREACH(q, &conn->raw_requests)
   {
     buf_queue_t *bq = QUEUE_DATA(q, buf_queue_t, member);
     write_buf((uv_stream_t *)conn->proxy_handle, bq->buf.base, bq->buf.len);
     free(bq->buf.base);
   }
-  http_free_raw_requests_queue(&conn->http_link_context.request);
+  free_raw_requests_queue(conn);
 }
 
 void proxy_http_request(char *ip, unsigned short port, conn_t *conn)
