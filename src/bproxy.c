@@ -128,6 +128,17 @@ static int ssl_servername_cb(SSL *s, int *ad, void *arg)
   {
     SSL_set_SSL_CTX(s, proxy_config->ssl_context);
   }
+  else if(proxy_config && proxy_config->ssl_passtrough)
+  {
+    conn_t* conn = arg;
+    strcpy(conn->http_link_context.request.hostname, hostname);
+
+    uv_link_unchain((uv_link_t*)conn->ssl_link, &conn->http_link);
+    uv_link_unchain(&conn->http_link, (uv_link_t*)&conn->observer);
+    uv_link_chain((uv_link_t*)conn->ssl_link, (uv_link_t*)&conn->observer);
+
+    uv_ssl_cancel(conn->ssl_link);
+  }
   else
   {
     log_error("SSL/TLS not configured properly for: %s", hostname);
@@ -185,10 +196,10 @@ void conn_init(uv_stream_t *handle)
   {
     CHECK_ALLOC(conn->ssl = SSL_new(default_ctx));
     SSL_CTX_set_tlsext_servername_callback(default_ctx, ssl_servername_cb);
-    SSL_CTX_set_tlsext_servername_arg(default_ctx, conn);
     SSL_set_accept_state(conn->ssl);
     CHECK_ALLOC(conn->ssl_link = uv_ssl_create(uv_default_loop(), conn->ssl, &err));
     CHECK(err);
+    ((uv_link_t*)conn->ssl_link)->data = conn;
     CHECK(uv_link_chain((uv_link_t *)&conn->source, (uv_link_t *)conn->ssl_link));
     CHECK(uv_link_chain((uv_link_t *)conn->ssl_link, &conn->http_link));
   }

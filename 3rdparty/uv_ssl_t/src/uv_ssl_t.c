@@ -20,6 +20,8 @@ static int uv_ssl_queue_write_cb(uv_ssl_t* ssl, uv_link_t* source,
 static void uv_ssl_flush_write_cb(uv_idle_t* handle);
 static char* uv_ssl_get_write_data(uv_ssl_write_req_t* req);
 
+static void do_nothing_close_cb(uv_link_t* link){(void)link;};
+
 typedef struct write_req_s{
   size_t write_size;
   size_t bufs_count;
@@ -68,6 +70,9 @@ uv_ssl_t* uv_ssl_create(uv_loop_t* loop, SSL* ssl, int* err) {
   *err = uv_link_init((uv_link_t*) res, &uv_ssl_methods);
   if (*err != 0)
     goto fail_link_init;
+
+  res->initial_buf.len = 0;
+  res->initial_buf.base = NULL;
 
   return res;
 
@@ -126,7 +131,7 @@ void uv_ssl_idle_close_cb(uv_handle_t* handle) {
     wrap->cb(wrap->source, 0, wrap->arg);
     free(wrap);
   }
-
+  free(ssl->initial_buf.base);
   free(ssl);
 }
 
@@ -153,10 +158,24 @@ int uv_ssl_cycle(uv_ssl_t* s) {
   s->cycle = 1;
 
   err = uv_ssl_cycle_input(s);
-  if (err == 0)
+  if (err == 0 && !s->cancel)
     err = uv_ssl_cycle_pending(s);
-  if (err == 0)
+  if (err == 0 && !s->cancel)
     err = uv_ssl_cycle_output(s);
+  if(s->cancel)
+  {
+    uv_link_propagate_read_cb((uv_link_t*) s, s->initial_buf.len, &s->initial_buf);
+    s->initial_buf.base = NULL;
+    s->initial_buf.len = 0;
+
+    // Unlink and destroy self and link neighbors
+    uv_link_t* child = s->child;
+    uv_link_t* parent = s->parent;
+    uv_link_unchain((uv_link_t*)s, s->child);
+    uv_link_unchain(s->parent, (uv_link_t*)s);
+    uv_link_chain(parent, child);
+    uv_ssl_destroy(s, (uv_link_t*)s, do_nothing_close_cb);
+  }
 
   s->cycle = 0;
 
@@ -594,6 +613,11 @@ int uv_ssl_pop_error(uv_ssl_t* ssl) {
   res = ssl->pending_err;
   ssl->pending_err = 0;
   return res;
+}
+
+void uv_ssl_cancel(uv_ssl_t* ssl)
+{
+  ssl->cancel = true;
 }
 
 

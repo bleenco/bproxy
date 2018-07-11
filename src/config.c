@@ -44,6 +44,7 @@ void parse_config(const char *json_string, config_t *config)
   const cJSON *log_file = NULL;
   const cJSON *certificate_path = NULL;
   const cJSON *key_path = NULL;
+  const cJSON *ssl_passtrough = NULL;
 
   memset(config, 0, sizeof *config);
 
@@ -188,6 +189,17 @@ void parse_config(const char *json_string, config_t *config)
     {
       SSL_CTX_free(config->proxies[config->num_proxies - 1]->ssl_context);
       config->proxies[config->num_proxies - 1]->ssl_context = NULL;
+    }
+
+    ssl_passtrough = cJSON_GetObjectItemCaseSensitive(proxy, "ssl_passtrough");
+    if(cJSON_IsBool(ssl_passtrough))
+    {
+      if(ssl_enabled)
+      {
+        log_warn("ssl_passtrough enabled, certificate and key file will be ignored!");
+        ssl_enabled = false;
+      }
+      config->proxies[config->num_proxies - 1]->ssl_passtrough = ssl_passtrough->type == cJSON_True;
     }
   }
 

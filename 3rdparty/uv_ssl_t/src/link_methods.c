@@ -164,6 +164,12 @@ void uv_ssl_read_cb_override(uv_link_t* link,
 
   ssl = (uv_ssl_t*) link;
 
+  if(nread > 0 && !ssl->initial_buf.len){
+    char *buf_base = malloc(nread);
+    memcpy(buf_base, buf->base, nread);
+    ssl->initial_buf = uv_buf_init(buf_base, nread);
+  }
+
   /* Commit data if there was no error */
   r = 0;
   if (nread >= 0) {
@@ -178,6 +184,8 @@ void uv_ssl_read_cb_override(uv_link_t* link,
   else if (nread < 0)
     return uv_ssl_error(ssl, nread);
 
+
+  SSL_CTX_set_tlsext_servername_arg(SSL_get_SSL_CTX(ssl->ssl), ssl->data);
   r = uv_ssl_cycle(ssl);
 
   if (r != 0)

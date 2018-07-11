@@ -10,6 +10,7 @@ extern "C" {
 #include "uv_link_t.h"
 
 #include "openssl/ssl.h"
+#include "stdbool.h"
 
 /* NOTE: can be cast to `uv_link_t` */
 typedef struct uv_ssl_s uv_ssl_t;
@@ -17,6 +18,9 @@ typedef struct uv_ssl_s uv_ssl_t;
 UV_EXTERN uv_ssl_t* uv_ssl_create(uv_loop_t* loop, SSL* ssl, int* err);
 
 int uv_ssl_setup_recommended_secure_context(SSL_CTX* ctx);
+
+/* This function can be only used in SNI callback */
+void uv_ssl_cancel(uv_ssl_t* ssl);
 
 #ifdef __cplusplus
 }
