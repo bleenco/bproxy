@@ -90,7 +90,7 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
         uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
         return;
       }
-      else if (proxy_config->ssl_passtrough && !conn->http_link_context.https)
+      else if (proxy_config->ssl_passthrough && !conn->http_link_context.https)
       {
         char *resp = malloc(4096 * sizeof(char));
         http_301_response(resp, &conn->http_link_context.request, server->config->secure_port);
@@ -136,7 +136,7 @@ static int ssl_servername_cb(SSL *s, int *ad, void *arg)
   {
     SSL_set_SSL_CTX(s, proxy_config->ssl_context);
   }
-  else if (proxy_config && proxy_config->ssl_passtrough)
+  else if (proxy_config && proxy_config->ssl_passthrough)
   {
     conn_t *conn = arg;
     strcpy(conn->http_link_context.request.hostname, hostname);
@@ -354,7 +354,7 @@ void proxy_connect_cb(uv_connect_t *req, int status)
     }
     free_raw_requests_queue(conn);
     char *resp = malloc(1024 * sizeof(char));
-    if (conn->config->ssl_passtrough)
+    if (conn->config->ssl_passthrough)
     {
       conn_close(conn);
     }
