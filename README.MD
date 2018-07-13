@@ -107,7 +107,8 @@ $ ./bproxy -c /path/to/bproxy-config.json
       "certificate_path": "certs/bleenco.io.crt",
       "key_path": "certs/bleenco.io.key",
       "ip": "127.0.0.1",
-      "port": 7500
+      "port": 7500,
+      "force_ssl": true
     },
     {
       "hosts": ["*.bleenco.io"],
@@ -118,6 +119,9 @@ $ ./bproxy -c /path/to/bproxy-config.json
   ]
 }
 ```
+
+`force_ssl` property enables redirect from http to https by responding with 301 http status.
+
 `ssl_passthrough` property enables proxying SSL/TLS servers. That means data is not decrypted or parsed, but is just forwarded to server and vice-versa. This also enables redirection from http to https.
 ### Building Docker Image
 
