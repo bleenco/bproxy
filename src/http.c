@@ -216,7 +216,7 @@ void http_301_response(char *resp, const http_request_t *request, unsigned short
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           168 + strlen(VERSION), new_url, VERSION);
+           174 + strlen(VERSION), new_url, VERSION);
 }
 
 void http_400_response(char *resp)
