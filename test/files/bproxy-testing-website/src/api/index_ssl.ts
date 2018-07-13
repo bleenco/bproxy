@@ -1,0 +1,64 @@
+import * as path from 'path';
+import * as express from 'express';
+import * as multer from 'multer';
+import * as rimraf from 'rimraf';
+import * as cors from 'cors';
+import * as bodyParser from 'body-parser';
+import * as https from 'https';
+import { mkdirSync, existsSync, readFileSync } from 'fs';
+
+const config = {
+  port: 4901
+};
+const uploadsDir = path.resolve(__dirname, 'uploads');
+
+if (!existsSync(uploadsDir)) {
+  mkdirSync(uploadsDir);
+}
+
+let storage: multer.StorageEngine = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    let ext = path.extname(file.originalname);
+    cb(null, `${Math.random().toString(36).substring(7)}${ext}`);
+  }
+});
+
+const upload: multer.Instance = multer({ storage: storage });
+const router = express.Router();
+
+router.post('/upload', upload.any(), (req: express.Request, res: express.Response) => {
+  // rimraf.sync(`${uploadsDir}/**/*`);
+  res.status(200).json(req.files);
+});
+
+router.post('/simple-form', (req: express.Request, res: express.Response) => {
+  res.status(200).json(req.body);
+});
+
+function index(req: express.Request, res: express.Response): void {
+  return res.status(200).sendFile(path.resolve(__dirname, '../index.html'));
+}
+
+const app = express();
+
+app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(router);
+
+app.use('/css', express.static(path.resolve(__dirname, '../css'), { index: false }));
+app.use('/js', express.static(path.resolve(__dirname, '../js'), { index: false }));
+app.use('/images', express.static(path.resolve(__dirname, '../images'), { index: false }));
+app.use('/css/fonts', express.static(path.resolve(__dirname, '../fonts'), { index: false }));
+app.get('/', index);
+
+var options = {
+  key: readFileSync(path.resolve(__dirname, '../../../certs/localhost.key')),
+  cert: readFileSync(path.resolve(__dirname, '../../../certs/localhost.crt')),
+};
+var server = https.createServer(options, app).listen(config.port, function () {
+  console.log(`Server running on port ${config.port}...`);
+});
+
