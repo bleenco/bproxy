@@ -32,7 +32,7 @@ static void observer_connection_link_shutdown_cb(uv_link_t *source, int status, 
   conn_close(conn);
 }
 
-static void observer_connection_link_close_cb(uv_link_t *link)
+static void client_connection_link_close_cb(uv_link_t *link)
 {
   conn_t *conn;
   conn = link->data;
@@ -53,23 +53,20 @@ void free_raw_requests_queue(conn_t *conn)
   }
 }
 
-static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nread,
+static void client_connection_read_cb(uv_link_t *observer, ssize_t nread,
                                         const uv_buf_t *buf)
 {
   conn_t *conn = (conn_t *)observer->data;
   if (nread > 0)
   {
-    // TODO: Remove observer and add bproxy link. Current observer implementation free-s memory after reading.
-    // But memory should be free-d only after error (nread < 0) to prevent buffer copying
     buf_queue_t *buf_queue_body_node = malloc(sizeof *buf_queue_body_node);
-    buf_queue_body_node->buf = uv_buf_init(malloc(nread), nread);
-    memcpy(buf_queue_body_node->buf.base, buf->base, nread);
+    buf_queue_body_node->buf.base = buf->base;
+    buf_queue_body_node->buf.len = nread;
     QUEUE_INIT(&buf_queue_body_node->member);
     QUEUE_INSERT_TAIL(&conn->raw_requests, &buf_queue_body_node->member);
 
     if (conn->proxy_handle)
     {
-      //write_buf((uv_stream_t *)conn->proxy_handle, buf->base, nread);
       QUEUE *q;
       QUEUE_FOREACH(q, &conn->raw_requests)
       {
@@ -115,6 +112,13 @@ static void observer_connection_read_cb(uv_link_observer_t *observer, ssize_t nr
     else
     {
       conn_close(conn);
+    }
+  }
+  if(nread <= 0)
+  {
+    if(buf)
+    {
+      free(buf->base);
     }
   }
 }
@@ -170,7 +174,7 @@ void conn_init(uv_stream_t *handle)
   CHECK(uv_link_source_init(&conn->source, (uv_stream_t *)conn->handle));
   conn->source.data = conn;
 
-  CHECK(uv_link_observer_init(&conn->observer));
+  CHECK(uv_link_init(&conn->observer, &proxy_methods));
   CHECK(uv_link_init(&conn->http_link, &http_link_methods));
   http_link_init(&conn->http_link, &conn->http_link_context, server->config);
 
@@ -217,7 +221,6 @@ void conn_init(uv_stream_t *handle)
   }
   CHECK(uv_link_chain((uv_link_t *)&conn->http_link, (uv_link_t *)&conn->observer));
 
-  conn->observer.observer_read_cb = observer_connection_read_cb;
   conn->observer.data = conn;
   CHECK(uv_link_read_start((uv_link_t *)&conn->observer));
 }
@@ -241,7 +244,7 @@ void conn_close(conn_t *conn)
       }
       else
       {
-        uv_link_close((uv_link_t *)&conn->observer, observer_connection_link_close_cb);
+        uv_link_close((uv_link_t *)&conn->observer, client_connection_link_close_cb);
       }
     }
   }
@@ -620,3 +623,16 @@ int main(int argc, char **argv)
   uv_run(server->loop, UV_RUN_DEFAULT);
   return 0;
 }
+
+uv_link_methods_t proxy_methods =
+{
+    .read_start = uv_link_default_read_start,
+    .read_stop = uv_link_default_read_stop,
+    .write = uv_link_default_write,
+    .try_write = uv_link_default_try_write,
+    .shutdown = uv_link_default_shutdown,
+    .close = uv_link_default_close,
+
+    .alloc_cb_override = uv_link_default_alloc_cb_override,
+    .read_cb_override = client_connection_read_cb
+};
