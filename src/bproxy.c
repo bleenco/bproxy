@@ -87,7 +87,7 @@ static void client_connection_read_cb(uv_link_t *observer, ssize_t nread,
         uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
         return;
       }
-      else if (proxy_config->ssl_passthrough && !conn->http_link_context.https)
+      else if (proxy_config->force_ssl && !conn->http_link_context.https)
       {
         char *resp = malloc(4096 * sizeof(char));
         http_301_response(resp, &conn->http_link_context.request, server->config->secure_port);
