@@ -15,6 +15,7 @@
     ]
   },
   "files": [
-    "src/api/index.ts"
+    "src/api/index.ts",
+    "src/api/index_ssl.ts"
   ]
 }
