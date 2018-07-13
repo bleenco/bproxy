@@ -45,6 +45,7 @@ void parse_config(const char *json_string, config_t *config)
   const cJSON *certificate_path = NULL;
   const cJSON *key_path = NULL;
   const cJSON *ssl_passthrough = NULL;
+  const cJSON *force_ssl = NULL;
 
   memset(config, 0, sizeof *config);
 
@@ -119,32 +120,34 @@ void parse_config(const char *json_string, config_t *config)
     config->num_proxies++;
 
     config->proxies[config->num_proxies - 1] = malloc(sizeof(proxy_config_t));
-    memset(config->proxies[config->num_proxies - 1], 0, sizeof(proxy_config_t));
+    proxy_config_t* proxy_config = config->proxies[config->num_proxies - 1];
+    memset(proxy_config, 0, sizeof(proxy_config_t));
+
     proxy_hosts = cJSON_GetObjectItemCaseSensitive(proxy, "hosts");
-    config->proxies[config->num_proxies - 1]->num_hosts = 0;
+    proxy_config->num_hosts = 0;
     cJSON_ArrayForEach(proxy_host, proxy_hosts)
     {
       if (cJSON_IsString(proxy_host) && proxy_host->valuestring)
       {
-        config->proxies[config->num_proxies - 1]->num_hosts++;
-        config->proxies[config->num_proxies - 1]->hosts[config->proxies[config->num_proxies - 1]->num_hosts - 1] = malloc(strlen(proxy_host->valuestring) + 1);
-        memcpy(config->proxies[config->num_proxies - 1]->hosts[config->proxies[config->num_proxies - 1]->num_hosts - 1], proxy_host->valuestring, strlen(proxy_host->valuestring));
-        config->proxies[config->num_proxies - 1]->hosts[config->proxies[config->num_proxies - 1]->num_hosts - 1][strlen(proxy_host->valuestring)] = '\0';
+        proxy_config->num_hosts++;
+        proxy_config->hosts[proxy_config->num_hosts - 1] = malloc(strlen(proxy_host->valuestring) + 1);
+        memcpy(proxy_config->hosts[proxy_config->num_hosts - 1], proxy_host->valuestring, strlen(proxy_host->valuestring));
+        proxy_config->hosts[proxy_config->num_hosts - 1][strlen(proxy_host->valuestring)] = '\0';
       }
     }
 
     proxy_ip = cJSON_GetObjectItemCaseSensitive(proxy, "ip");
     if (cJSON_IsString(proxy_ip) && proxy_ip->valuestring)
     {
-      config->proxies[config->num_proxies - 1]->ip = malloc(20);
-      memcpy(config->proxies[config->num_proxies - 1]->ip, proxy_ip->valuestring, strlen(proxy_ip->valuestring));
-      config->proxies[config->num_proxies - 1]->ip[strlen(proxy_ip->valuestring)] = '\0';
+      proxy_config->ip = malloc(20);
+      memcpy(proxy_config->ip, proxy_ip->valuestring, strlen(proxy_ip->valuestring));
+      proxy_config->ip[strlen(proxy_ip->valuestring)] = '\0';
     }
 
     proxy_port = cJSON_GetObjectItemCaseSensitive(proxy, "port");
     if (cJSON_IsNumber(proxy_port) && proxy_port->valueint)
     {
-      config->proxies[config->num_proxies - 1]->port = proxy_port->valueint;
+      proxy_config->port = proxy_port->valueint;
     }
 
     bool ssl_enabled = config->secure_port > 0;
@@ -163,14 +166,14 @@ void parse_config(const char *json_string, config_t *config)
 
     if (ssl_enabled)
     {
-      config->proxies[config->num_proxies - 1]->ssl_context = SSL_CTX_new(SSLv23_method());
-      if (!SSL_CTX_use_certificate_chain_file(config->proxies[config->num_proxies - 1]->ssl_context, certificate_path->valuestring))
+      proxy_config->ssl_context = SSL_CTX_new(SSLv23_method());
+      if (!SSL_CTX_use_certificate_chain_file(proxy_config->ssl_context, certificate_path->valuestring))
       {
         int err = ERR_get_error();
         log_error("Could not load certificate file: %s; reason: %s", certificate_path->valuestring, ERR_error_string(err, NULL));
         ssl_enabled = false;
       }
-      if (ssl_enabled && !SSL_CTX_use_PrivateKey_file(config->proxies[config->num_proxies - 1]->ssl_context, key_path->valuestring, SSL_FILETYPE_PEM))
+      if (ssl_enabled && !SSL_CTX_use_PrivateKey_file(proxy_config->ssl_context, key_path->valuestring, SSL_FILETYPE_PEM))
       {
         int err = ERR_get_error();
         log_error("Could not load key file: %s or key doesn't match certificate: %s; reason: %s", key_path->valuestring, certificate_path->valuestring, ERR_error_string(err, NULL));
@@ -179,11 +182,17 @@ void parse_config(const char *json_string, config_t *config)
     }
     if (ssl_enabled)
     {
-      if (uv_ssl_setup_recommended_secure_context(config->proxies[config->num_proxies - 1]->ssl_context))
+      if (uv_ssl_setup_recommended_secure_context(proxy_config->ssl_context))
       {
         log_error("configuring recommended secure context");
         ssl_enabled = false;
       }
+    }
+
+    force_ssl = cJSON_GetObjectItemCaseSensitive(proxy, "force_ssl");
+    if (cJSON_IsBool(force_ssl))
+    {
+      proxy_config->force_ssl = force_ssl->type == cJSON_True;
     }
 
     ssl_passthrough = cJSON_GetObjectItemCaseSensitive(proxy, "ssl_passthrough");
@@ -194,14 +203,17 @@ void parse_config(const char *json_string, config_t *config)
         log_warn("ssl_passthrough enabled, certificate and key file will be ignored!");
         ssl_enabled = false;
       }
-      config->proxies[config->num_proxies - 1]->ssl_passthrough = ssl_passthrough->type == cJSON_True;
+      proxy_config->ssl_passthrough = ssl_passthrough->type == cJSON_True;
+      proxy_config->force_ssl = proxy_config->ssl_passthrough ? true : proxy_config->force_ssl;
     }
 
     if (!ssl_enabled)
     {
-      SSL_CTX_free(config->proxies[config->num_proxies - 1]->ssl_context);
-      config->proxies[config->num_proxies - 1]->ssl_context = NULL;
+      SSL_CTX_free(proxy_config->ssl_context);
+      proxy_config->ssl_context = NULL;
+      force_ssl = false;
     }
+
   }
 
   cJSON_Delete(json);

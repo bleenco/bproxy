@@ -32,6 +32,7 @@ typedef struct proxy_config_t
   int num_hosts;
   SSL_CTX *ssl_context;
   bool ssl_passthrough;
+  bool force_ssl;
 } proxy_config_t;
 
 typedef struct config_t
