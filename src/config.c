@@ -120,7 +120,7 @@ void parse_config(const char *json_string, config_t *config)
     config->num_proxies++;
 
     config->proxies[config->num_proxies - 1] = malloc(sizeof(proxy_config_t));
-    proxy_config_t* proxy_config = config->proxies[config->num_proxies - 1];
+    proxy_config_t *proxy_config = config->proxies[config->num_proxies - 1];
     memset(proxy_config, 0, sizeof(proxy_config_t));
 
     proxy_hosts = cJSON_GetObjectItemCaseSensitive(proxy, "hosts");
@@ -213,7 +213,6 @@ void parse_config(const char *json_string, config_t *config)
       proxy_config->ssl_context = NULL;
       force_ssl = false;
     }
-
   }
 
   cJSON_Delete(json);

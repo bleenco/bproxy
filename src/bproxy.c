@@ -54,7 +54,7 @@ void free_raw_requests_queue(conn_t *conn)
 }
 
 static void client_connection_read_cb(uv_link_t *observer, ssize_t nread,
-                                        const uv_buf_t *buf)
+                                      const uv_buf_t *buf)
 {
   conn_t *conn = (conn_t *)observer->data;
   if (nread > 0)
@@ -114,9 +114,9 @@ static void client_connection_read_cb(uv_link_t *observer, ssize_t nread,
       conn_close(conn);
     }
   }
-  if(nread <= 0)
+  if (nread <= 0)
   {
-    if(buf)
+    if (buf)
     {
       free(buf->base);
     }
@@ -625,14 +625,13 @@ int main(int argc, char **argv)
 }
 
 uv_link_methods_t proxy_methods =
-{
-    .read_start = uv_link_default_read_start,
-    .read_stop = uv_link_default_read_stop,
-    .write = uv_link_default_write,
-    .try_write = uv_link_default_try_write,
-    .shutdown = uv_link_default_shutdown,
-    .close = uv_link_default_close,
+    {
+        .read_start = uv_link_default_read_start,
+        .read_stop = uv_link_default_read_stop,
+        .write = uv_link_default_write,
+        .try_write = uv_link_default_try_write,
+        .shutdown = uv_link_default_shutdown,
+        .close = uv_link_default_close,
 
-    .alloc_cb_override = uv_link_default_alloc_cb_override,
-    .read_cb_override = client_connection_read_cb
-};
+        .alloc_cb_override = uv_link_default_alloc_cb_override,
+        .read_cb_override = client_connection_read_cb};
