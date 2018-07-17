@@ -15,6 +15,7 @@
 
 #include "cJSON.h"
 #include "log.h"
+#include "version.h"
 
 #include "openssl/ssl.h"
 #include "openssl/err.h"
@@ -35,17 +36,29 @@ typedef struct proxy_config_t
   bool force_ssl;
 } proxy_config_t;
 
+typedef struct templates_t
+{
+  char *status_400_template;
+  char *status_404_template;
+  char *status_502_template;
+} templates_t;
+
 typedef struct config_t
 {
   unsigned short port;
   unsigned short secure_port;
   char *gzip_mime_types[CONFIG_MAX_GZIP_MIME_TYPES];
   int num_gzip_mime_types;
+  templates_t *templates;
   proxy_config_t *proxies[CONFIG_MAX_PROXIES];
   int num_proxies;
 } config_t;
 
 char *read_file(char *path);
 void parse_config(const char *json_string, config_t *config);
+
+void http_400_response(char *resp);
+void http_404_response(char *resp);
+void http_502_response(char *resp);
 
 #endif // _BPROXY_CONFIG_H_

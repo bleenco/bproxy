@@ -81,8 +81,8 @@ static void client_connection_read_cb(uv_link_t *observer, ssize_t nread,
       proxy_config_t *proxy_config = find_proxy_config(conn->http_link_context.request.hostname);
       if (!proxy_config)
       {
-        char *resp = malloc(4096 * sizeof(char));
-        http_404_response(resp);
+        char *resp = malloc(strlen(server->config->templates->status_404_template) * sizeof(char));
+        strncpy(resp, server->config->templates->status_404_template, strlen(server->config->templates->status_404_template));
         uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
         uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
         return;
@@ -104,8 +104,8 @@ static void client_connection_read_cb(uv_link_t *observer, ssize_t nread,
   {
     if (nread == -400)
     {
-      char *resp = malloc(1024 * sizeof(char));
-      http_400_response(resp);
+      char *resp = malloc(strlen(server->config->templates->status_400_template) * sizeof(char));
+      strncpy(resp, server->config->templates->status_400_template, strlen(server->config->templates->status_400_template));
       uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
       uv_link_write((uv_link_t *)observer, &tmp_buf, 1, NULL, write_link_cb, resp);
     }
@@ -356,14 +356,14 @@ void proxy_connect_cb(uv_connect_t *req, int status)
       free(bq->buf.base);
     }
     free_raw_requests_queue(conn);
-    char *resp = malloc(1024 * sizeof(char));
     if (conn->config->ssl_passthrough)
     {
       conn_close(conn);
     }
     else
     {
-      http_502_response(resp);
+      char *resp = malloc(strlen(server->config->templates->status_502_template) * sizeof(char));
+      strncpy(resp, server->config->templates->status_502_template, strlen(server->config->templates->status_502_template));
       uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
       uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, write_link_cb, resp);
     }
@@ -624,14 +624,17 @@ int main(int argc, char **argv)
   return 0;
 }
 
+// clang-format off
 uv_link_methods_t proxy_methods =
-    {
-        .read_start = uv_link_default_read_start,
-        .read_stop = uv_link_default_read_stop,
-        .write = uv_link_default_write,
-        .try_write = uv_link_default_try_write,
-        .shutdown = uv_link_default_shutdown,
-        .close = uv_link_default_close,
+{
+  .read_start = uv_link_default_read_start,
+  .read_stop = uv_link_default_read_stop,
+  .write = uv_link_default_write,
+  .try_write = uv_link_default_try_write,
+  .shutdown = uv_link_default_shutdown,
+  .close = uv_link_default_close,
 
-        .alloc_cb_override = uv_link_default_alloc_cb_override,
-        .read_cb_override = client_connection_read_cb};
+  .alloc_cb_override = uv_link_default_alloc_cb_override,
+  .read_cb_override = client_connection_read_cb
+};
+// clang-format on
