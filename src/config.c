@@ -121,7 +121,7 @@ void parse_config(const char *json_string, config_t *config)
   templates = cJSON_GetObjectItemCaseSensitive(json, "templates");
 
   status_400_template = cJSON_GetObjectItemCaseSensitive(templates, "status_400_template");
-  if (!cJSON_IsString(status_400_template) || !status_400_template->valuestring)
+  if (!cJSON_IsString(status_400_template) || !status_400_template->valuestring || strcmp(status_400_template->valuestring, "") == 0)
   {
     char *contents = malloc(4096 * sizeof(char));
     http_400_response(contents);
@@ -132,13 +132,19 @@ void parse_config(const char *json_string, config_t *config)
   else
   {
     char *contents = read_file(status_400_template->valuestring);
-    config->templates->status_400_template = malloc(strlen(contents) + 1);
-    memcpy(config->templates->status_400_template, contents, strlen(contents));
-    config->templates->status_400_template[strlen(contents)] = '\0';
+    char *header = malloc(205 * sizeof(char));
+    sprintf(header, "HTTP/1.1 400 Bad Request\r\n"
+                    "Content-Length: %ld\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: Close\r\n"
+                    "\r\n", strlen(contents));
+    config->templates->status_400_template = malloc(205 + strlen(contents) + 1);
+    memcpy(config->templates->status_400_template, header, strlen(header));
+    strcat(config->templates->status_400_template, contents);
   }
 
   status_404_template = cJSON_GetObjectItemCaseSensitive(templates, "status_404_template");
-  if (!cJSON_IsString(status_404_template) || !status_404_template->valuestring)
+  if (!cJSON_IsString(status_404_template) || !status_404_template->valuestring || strcmp(status_404_template->valuestring, "") == 0)
   {
     char *contents = malloc(4096 * sizeof(char));
     http_404_response(contents);
@@ -149,13 +155,19 @@ void parse_config(const char *json_string, config_t *config)
   else
   {
     char *contents = read_file(status_404_template->valuestring);
-    config->templates->status_404_template = malloc(strlen(contents) + 1);
-    memcpy(config->templates->status_404_template, contents, strlen(contents));
-    config->templates->status_404_template[strlen(contents)] = '\0';
+    char *header = malloc(200 * sizeof(char));
+    sprintf(header, "HTTP/1.1 404 Not Found\r\n"
+                    "Content-Length: %ld\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: Close\r\n"
+                    "\r\n", strlen(contents));
+    config->templates->status_404_template = malloc(200 + strlen(contents) + 1);
+    memcpy(config->templates->status_404_template, header, strlen(header));
+    strcat(config->templates->status_404_template, contents);
   }
 
   status_502_template = cJSON_GetObjectItemCaseSensitive(templates, "status_502_template");
-  if (!cJSON_IsString(status_502_template) || !status_502_template->valuestring)
+  if (!cJSON_IsString(status_502_template) || !status_502_template->valuestring || strcmp(status_502_template->valuestring, "") == 0)
   {
     char *contents = malloc(4096 * sizeof(char));
     http_502_response(contents);
@@ -166,9 +178,15 @@ void parse_config(const char *json_string, config_t *config)
   else
   {
     char *contents = read_file(status_502_template->valuestring);
-    config->templates->status_502_template = malloc(strlen(contents) + 1);
-    memcpy(config->templates->status_502_template, contents, strlen(contents));
-    config->templates->status_502_template[strlen(contents)] = '\0';
+    char *header = malloc(205 * sizeof(char));
+    sprintf(header, "HTTP/1.1 502 Bad Gateway\r\n"
+                    "Content-Length: %ld\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: Close\r\n"
+                    "\r\n", strlen(contents));
+    config->templates->status_502_template = malloc(205 + strlen(contents) + 1);
+    memcpy(config->templates->status_502_template, header, strlen(header));
+    strcat(config->templates->status_502_template, contents);
   }
 
   config->num_proxies = 0;
@@ -316,7 +334,6 @@ void http_502_response(char *resp)
            "Content-Length: %ld\r\n"
            "Content-Type: text/html\r\n"
            "Connection: Close\r\n"
-           "Server: vex/%s\r\n"
            "\r\n"
            "<html>\r\n"
            "<head>\r\n"
@@ -328,5 +345,5 @@ void http_502_response(char *resp)
            "<p align=\"center\">bproxy %s</p>\r\n"
            "</body>\r\n"
            "</html>\r\n",
-           162 + strlen(VERSION), VERSION, VERSION);
+           160 + strlen(VERSION), VERSION);
 }

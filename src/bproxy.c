@@ -363,7 +363,7 @@ void proxy_connect_cb(uv_connect_t *req, int status)
     else
     {
       char *resp = malloc(strlen(server->config->templates->status_502_template) * sizeof(char));
-      strncpy(resp, server->config->templates->status_502_template, strlen(server->config->templates->status_502_template));
+      strcpy(resp, server->config->templates->status_502_template);
       uv_buf_t tmp_buf = uv_buf_init(resp, strlen(resp));
       uv_link_write((uv_link_t *)&conn->observer, &tmp_buf, 1, NULL, write_link_cb, resp);
     }
