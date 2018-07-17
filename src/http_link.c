@@ -81,9 +81,8 @@ void http_read_cb_override(uv_link_t *link, ssize_t nread, const uv_buf_t *buf)
         }
       }
 
-      size_t np = http_parser_execute(&context->request.parser, &parser_settings, buf->base,
-                                      nread);
-      if (np != nread)
+      size_t np = http_parser_execute(&context->request.parser, &parser_settings, buf->base, nread);
+      if (np != (size_t)nread)
       {
         uv_shutdown_t *req;
         req = (uv_shutdown_t *)malloc(sizeof *req);
