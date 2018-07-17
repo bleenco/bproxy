@@ -10,7 +10,10 @@
                 "/usr/include",
                 "${workspaceRoot}",
                 "${workspaceRoot}/include",
-                "${workspaceFolder}/gypkg_deps/indutny/uv_link_t@semver-16bf38c/include"
+                "${workspaceFolder}/gypkg_deps/indutny/uv_link_t@semver-16bf38c/include",
+                "${workspaceFolder}/3rdparty/openssl/openssl/include",
+                "${workspaceFolder}/3rdparty/uv_ssl_t/include",
+                "${workspaceFolder}/3rdparty/uv_link_t/include"
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
