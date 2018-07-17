@@ -98,6 +98,11 @@ $ ./bproxy -c /path/to/bproxy-config.json
   "secure_port": 443,
   "gzip_mime_types": ["text/css", "application/javascript", "application/x-javascript"],
   "log_file": "bproxy.log",
+  "templates": {
+    "status_400_template": "",
+    "status_404_template": "templates/404.html",
+    "status_502_template": ""
+  },
   "proxies": [
     {
       "hosts": [
@@ -145,32 +150,6 @@ $ docker run -it --name bproxy --net host -v ~/path/to/bproxy.json:/bproxy/bprox
 $ npm install
 $ npm test
 ```
-
-### Bproxy Team
-
-<div align="center">
-  <table>
-    <tbody>
-      <tr>
-        <td align="center" valign="top">
-          <img width="150" height="150" src="https://github.com/martinopresnik.png?s=150">
-          <br>
-          <a href="https://github.com/martinopresnik">Martin Opresnik</a>
-        </td>
-        <td align="center" valign="top">
-          <img width="150" height="150" src="https://github.com/jkuri.png?s=150">
-          <br>
-          <a href="https://github.com/jkuri">Jan Kuri</a>
-        </td>
-        <td align="center" valign="top">
-          <img width="150" height="150" src="https://github.com/irmana.png?s=150">
-          <br>
-          <a href="https://github.com/irmana">Irman Abdic</a>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
 
 ### LICENSE
 
