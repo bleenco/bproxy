@@ -10,4 +10,4 @@
 
 #define VERSION "0.13.0"
 
-#endif // _BPROXY_VERSION_H_
+#endif  // _BPROXY_VERSION_H_

@@ -19,25 +19,14 @@ static const char *level_colors[] =
 };
 // clang-format on
 
-void log_set_fp(FILE *fp)
-{
-  L.fp = fp;
-}
+void log_set_fp(FILE *fp) { L.fp = fp; }
 
-void log_set_level(int level)
-{
-  L.level = level;
-}
+void log_set_level(int level) { L.level = level; }
 
-void log_set_quiet(int enable)
-{
-  L.quiet = enable ? 1 : 0;
-}
+void log_set_quiet(int enable) { L.quiet = enable ? 1 : 0; }
 
-void log_log(int level, const char *fmt, ...)
-{
-  if (level < L.level)
-  {
+void log_log(int level, const char *fmt, ...) {
+  if (level < L.level) {
     return;
   }
 
@@ -45,12 +34,12 @@ void log_log(int level, const char *fmt, ...)
   struct tm *lt = localtime(&t);
 
   // log to stderr
-  if (!L.quiet)
-  {
+  if (!L.quiet) {
     va_list args;
     char buf[16];
     buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt)] = '\0';
-    fprintf(stderr, "%s %s%-5s\x1b[0m \x1b[90m \x1b[0m ", buf, level_colors[level], level_names[level]);
+    fprintf(stderr, "%s %s%-5s\x1b[0m \x1b[90m \x1b[0m ", buf,
+            level_colors[level], level_names[level]);
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
     va_end(args);
@@ -58,8 +47,7 @@ void log_log(int level, const char *fmt, ...)
   }
 
   // log to file
-  if (L.fp)
-  {
+  if (L.fp) {
     va_list args;
     char buf[32];
     buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';

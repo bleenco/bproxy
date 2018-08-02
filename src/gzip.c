@@ -1,12 +1,11 @@
 #include "gzip.h"
 
-#include "zlib.h"
 #include <stdio.h>
 #include <string.h>
 #include "stdint.h"
+#include "zlib.h"
 
-int gzip_init_state(gzip_state_t *state, char *http_header)
-{
+int gzip_init_state(gzip_state_t *state, char *http_header) {
   int ret_status = 0;
 
   memset(state, 0, sizeof *state);
@@ -30,25 +29,21 @@ int gzip_init_state(gzip_state_t *state, char *http_header)
   state->current_size_buf_out = buf_sizes;
 
   ret_status = deflateInit2(&state->strm, -1, 8, 15 + 16, 8, 0);
-  if (ret_status != Z_OK)
-  {
+  if (ret_status != Z_OK) {
     printf("Init failed!");
   }
   return ret_status;
 }
 
-void gzip_free_state(gzip_state_t *state)
-{
-  if (state)
-  {
+void gzip_free_state(gzip_state_t *state) {
+  if (state) {
     deflateEnd(&state->strm);
     free(state->gzip_body);
     free(state->chunk_body);
   }
 }
 
-int gzip_compress(gzip_state_t *state)
-{
+int gzip_compress(gzip_state_t *state) {
   state->strm.next_in = state->raw_body;
   state->strm.next_out = state->gzip_body;
 
@@ -56,8 +51,7 @@ int gzip_compress(gzip_state_t *state)
   state->strm.avail_out = state->current_size_buf_out;
 
   (void)deflate(&state->strm, Z_BLOCK);
-  if (state->last_chunk)
-  {
+  if (state->last_chunk) {
     (void)deflate(&state->strm, Z_FINISH);
   }
 
@@ -68,8 +62,7 @@ int gzip_compress(gzip_state_t *state)
   return 0;
 }
 
-void gzip_chunk_compress(gzip_state_t *state)
-{
+void gzip_chunk_compress(gzip_state_t *state) {
   int gz_size = state->current_size_out;
   // Message def: hex size, \r\n, gzip content, \r\n, (if last add) 0 \r\n\r\n
   char *head_def = "%X\r\n";
@@ -77,8 +70,7 @@ void gzip_chunk_compress(gzip_state_t *state)
   char head[200];
 
   char *tail = "\r\n";
-  if (state->last_chunk)
-  {
+  if (state->last_chunk) {
     tail = "\r\n0\r\n\r\n";
   }
 
@@ -88,8 +80,7 @@ void gzip_chunk_compress(gzip_state_t *state)
   size_t offset = 0;
   size_t copy_len;
 
-  if (state->first_chunk)
-  {
+  if (state->first_chunk) {
     // Copy http header
     copy_len = strlen(state->http_header);
     memcpy(state->chunk_body + offset, state->http_header, copy_len);

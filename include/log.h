@@ -8,23 +8,15 @@
 #ifndef _BPROXY_LOG_H_
 #define _BPROXY_LOG_H_
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <time.h>
 
-enum
-{
-  LOG_DEBUG,
-  LOG_INFO,
-  LOG_WARN,
-  LOG_ERROR,
-  LOG_FATAL
-};
+enum { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_FATAL };
 
-static struct
-{
+static struct {
   FILE *fp;
   int level;
   int quiet;
@@ -42,4 +34,4 @@ void log_set_quiet(int enable);
 
 void log_log(int level, const char *fmt, ...);
 
-#endif // _BPROXY_LOG_H_
+#endif  // _BPROXY_LOG_H_

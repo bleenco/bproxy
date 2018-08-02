@@ -1,14 +1,13 @@
 #ifndef GZIP_H
 #define GZIP_H
 
-#include <stdlib.h>
-#include <stdbool.h>
 #include <ctype.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
 #include "zlib.h"
 
-typedef struct gzip_state_t
-{
+typedef struct gzip_state_t {
   z_stream strm;
   int current_size_in;
   int current_size_out;

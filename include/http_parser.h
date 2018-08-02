@@ -149,8 +149,7 @@ typedef int (*http_cb)(http_parser *);
   XX(510, NOT_EXTENDED, Not Extended)                                       \
   XX(511, NETWORK_AUTHENTICATION_REQUIRED, Network Authentication Required)
 
-enum http_status
-{
+enum http_status {
 #define XX(num, name, string) HTTP_STATUS_##name = num,
   HTTP_STATUS_MAP(XX)
 #undef XX
@@ -201,23 +200,16 @@ enum http_status
   /* icecast */                    \
   XX(33, SOURCE, SOURCE)
 
-enum http_method
-{
+enum http_method {
 #define XX(num, name, string) HTTP_##name = num,
   HTTP_METHOD_MAP(XX)
 #undef XX
 };
 
-enum http_parser_type
-{
-  HTTP_REQUEST,
-  HTTP_RESPONSE,
-  HTTP_BOTH
-};
+enum http_parser_type { HTTP_REQUEST, HTTP_RESPONSE, HTTP_BOTH };
 
 /* Flag values for http_parser.flags field */
-enum flags
-{
+enum flags {
   F_CHUNKED = 1 << 0,
   F_CONNECTION_KEEP_ALIVE = 1 << 1,
   F_CONNECTION_CLOSE = 1 << 2,
@@ -232,64 +224,56 @@ enum flags
  *
  * The provided argument should be a macro that takes 2 arguments.
  */
-#define HTTP_ERRNO_MAP(XX)                                            \
-  /* No error */                                                      \
-  XX(OK, "success")                                                   \
-                                                                      \
-  /* Callback-related errors */                                       \
-  XX(CB_message_begin, "the on_message_begin callback failed")        \
-  XX(CB_url, "the on_url callback failed")                            \
-  XX(CB_header_field, "the on_header_field callback failed")          \
-  XX(CB_header_value, "the on_header_value callback failed")          \
-  XX(CB_headers_complete, "the on_headers_complete callback failed")  \
-  XX(CB_body, "the on_body callback failed")                          \
-  XX(CB_message_complete, "the on_message_complete callback failed")  \
-  XX(CB_status, "the on_status callback failed")                      \
-  XX(CB_chunk_header, "the on_chunk_header callback failed")          \
-  XX(CB_chunk_complete, "the on_chunk_complete callback failed")      \
-                                                                      \
-  /* Parsing-related errors */                                        \
-  XX(INVALID_EOF_STATE, "stream ended at an unexpected time")         \
-  XX(HEADER_OVERFLOW,                                                 \
-     "too many header bytes seen; overflow detected")                 \
-  XX(CLOSED_CONNECTION,                                               \
-     "data received after completed connection: close message")       \
-  XX(INVALID_VERSION, "invalid HTTP version")                         \
-  XX(INVALID_STATUS, "invalid HTTP status code")                      \
-  XX(INVALID_METHOD, "invalid HTTP method")                           \
-  XX(INVALID_URL, "invalid URL")                                      \
-  XX(INVALID_HOST, "invalid host")                                    \
-  XX(INVALID_PORT, "invalid port")                                    \
-  XX(INVALID_PATH, "invalid path")                                    \
-  XX(INVALID_QUERY_STRING, "invalid query string")                    \
-  XX(INVALID_FRAGMENT, "invalid fragment")                            \
-  XX(LF_EXPECTED, "LF character expected")                            \
-  XX(INVALID_HEADER_TOKEN, "invalid character in header")             \
-  XX(INVALID_CONTENT_LENGTH,                                          \
-     "invalid character in content-length header")                    \
-  XX(UNEXPECTED_CONTENT_LENGTH,                                       \
-     "unexpected content-length header")                              \
-  XX(INVALID_CHUNK_SIZE,                                              \
-     "invalid character in chunk size header")                        \
-  XX(INVALID_CONSTANT, "invalid constant string")                     \
-  XX(INVALID_INTERNAL_STATE, "encountered unexpected internal state") \
-  XX(STRICT, "strict mode assertion failed")                          \
-  XX(PAUSED, "parser is paused")                                      \
+#define HTTP_ERRNO_MAP(XX)                                                 \
+  /* No error */                                                           \
+  XX(OK, "success")                                                        \
+                                                                           \
+  /* Callback-related errors */                                            \
+  XX(CB_message_begin, "the on_message_begin callback failed")             \
+  XX(CB_url, "the on_url callback failed")                                 \
+  XX(CB_header_field, "the on_header_field callback failed")               \
+  XX(CB_header_value, "the on_header_value callback failed")               \
+  XX(CB_headers_complete, "the on_headers_complete callback failed")       \
+  XX(CB_body, "the on_body callback failed")                               \
+  XX(CB_message_complete, "the on_message_complete callback failed")       \
+  XX(CB_status, "the on_status callback failed")                           \
+  XX(CB_chunk_header, "the on_chunk_header callback failed")               \
+  XX(CB_chunk_complete, "the on_chunk_complete callback failed")           \
+                                                                           \
+  /* Parsing-related errors */                                             \
+  XX(INVALID_EOF_STATE, "stream ended at an unexpected time")              \
+  XX(HEADER_OVERFLOW, "too many header bytes seen; overflow detected")     \
+  XX(CLOSED_CONNECTION,                                                    \
+     "data received after completed connection: close message")            \
+  XX(INVALID_VERSION, "invalid HTTP version")                              \
+  XX(INVALID_STATUS, "invalid HTTP status code")                           \
+  XX(INVALID_METHOD, "invalid HTTP method")                                \
+  XX(INVALID_URL, "invalid URL")                                           \
+  XX(INVALID_HOST, "invalid host")                                         \
+  XX(INVALID_PORT, "invalid port")                                         \
+  XX(INVALID_PATH, "invalid path")                                         \
+  XX(INVALID_QUERY_STRING, "invalid query string")                         \
+  XX(INVALID_FRAGMENT, "invalid fragment")                                 \
+  XX(LF_EXPECTED, "LF character expected")                                 \
+  XX(INVALID_HEADER_TOKEN, "invalid character in header")                  \
+  XX(INVALID_CONTENT_LENGTH, "invalid character in content-length header") \
+  XX(UNEXPECTED_CONTENT_LENGTH, "unexpected content-length header")        \
+  XX(INVALID_CHUNK_SIZE, "invalid character in chunk size header")         \
+  XX(INVALID_CONSTANT, "invalid constant string")                          \
+  XX(INVALID_INTERNAL_STATE, "encountered unexpected internal state")      \
+  XX(STRICT, "strict mode assertion failed")                               \
+  XX(PAUSED, "parser is paused")                                           \
   XX(UNKNOWN, "an unknown error occurred")
 
 /* Define HPE_* values for each errno value above */
 #define HTTP_ERRNO_GEN(n, s) HPE_##n,
-enum http_errno
-{
-  HTTP_ERRNO_MAP(HTTP_ERRNO_GEN)
-};
+enum http_errno { HTTP_ERRNO_MAP(HTTP_ERRNO_GEN) };
 #undef HTTP_ERRNO_GEN
 
 /* Get an http_errno value from an http_parser */
 #define HTTP_PARSER_ERRNO(p) ((enum http_errno)(p)->http_errno)
 
-struct http_parser
-{
+struct http_parser {
   /** PRIVATE **/
   unsigned int type : 2;         /* enum http_parser_type */
   unsigned int flags : 8;        /* F_* values from 'flags' enum; semi-public */
@@ -319,8 +303,7 @@ struct http_parser
   void *data; /* A pointer to get hook to the "connection" or "socket" object */
 };
 
-struct http_parser_settings
-{
+struct http_parser_settings {
   http_cb on_message_begin;
   http_data_cb on_url;
   http_data_cb on_status;
@@ -336,8 +319,7 @@ struct http_parser_settings
   http_cb on_chunk_complete;
 };
 
-enum http_parser_url_fields
-{
+enum http_parser_url_fields {
   UF_SCHEMA = 0,
   UF_HOST = 1,
   UF_PORT = 2,
@@ -355,13 +337,11 @@ enum http_parser_url_fields
  * because we probably have padding left over), we convert any port to
  * a uint16_t.
  */
-struct http_parser_url
-{
+struct http_parser_url {
   uint16_t field_set; /* Bitmask of (1 << UF_*) values */
   uint16_t port;      /* Converted UF_PORT string */
 
-  struct
-  {
+  struct {
     uint16_t off; /* Offset into buffer in which field starts */
     uint16_t len; /* Length of run in buffer */
   } field_data[UF_MAX];
@@ -389,8 +369,7 @@ void http_parser_settings_init(http_parser_settings *settings);
  * `parser->http_errno` on error. */
 size_t http_parser_execute(http_parser *parser,
                            const http_parser_settings *settings,
-                           const char *data,
-                           size_t len);
+                           const char *data, size_t len);
 
 /* If http_should_keep_alive() in the on_headers_complete or
  * on_message_complete callback returns 0, then this should be
@@ -413,8 +392,7 @@ const char *http_errno_description(enum http_errno err);
 void http_parser_url_init(struct http_parser_url *u);
 
 /* Parse a URL; return nonzero on failure */
-int http_parser_parse_url(const char *buf, size_t buflen,
-                          int is_connect,
+int http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
                           struct http_parser_url *u);
 
 /* Pause or un-pause the parser; a nonzero value pauses */

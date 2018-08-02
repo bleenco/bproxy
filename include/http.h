@@ -8,16 +8,16 @@
 #ifndef _BPROXY_HTTP_H_
 #define _BPROXY_HTTP_H_
 
+#include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <stdbool.h>
 
-#include "uv.h"
-#include "http_parser.h"
-#include "version.h"
 #include "config.h"
+#include "http_parser.h"
+#include "uv.h"
+#include "version.h"
 
 #include "gzip.h"
 #include "queue.h"
@@ -27,21 +27,14 @@
 
 typedef bool boolean;
 
-enum header_element
-{
-  NONE = 0,
-  FIELD,
-  VALUE
-};
+enum header_element { NONE = 0, FIELD, VALUE };
 
-typedef struct buf_queue_s
-{
+typedef struct buf_queue_s {
   uv_buf_t buf;
   QUEUE member;
 } buf_queue_t;
 
-typedef struct http_request_s
-{
+typedef struct http_request_s {
   ssize_t raw_len;
   enum http_method method;
   char host[256];
@@ -64,8 +57,7 @@ typedef struct http_request_s
   char *status_line;
 } http_request_t;
 
-typedef struct http_response_s
-{
+typedef struct http_response_s {
   http_parser parser;
   char *raw_body;
   size_t body_size;
@@ -83,17 +75,13 @@ typedef struct http_response_s
   gzip_state_t *gzip_state;
 } http_response_t;
 
-typedef struct http_link_context_s
-{
+typedef struct http_link_context_s {
   http_request_t request;
   http_response_t response;
-  config_t *server_config; // TODO: Move this out, and use only part of configuration needed
+  config_t *server_config;  // TODO: Move this out, and use only part of
+                            // configuration needed
   bool https;
-  enum
-  {
-    TYPE_REQUEST,
-    TYPE_WEBSOCKET
-  } type;
+  enum { TYPE_REQUEST, TYPE_WEBSOCKET } type;
   bool initial_reply;
   char peer_ip[45];
 
@@ -119,7 +107,8 @@ void parse_requested_host(http_request_t *request);
 int insert_header(char *src, char *resp);
 void insert_substring(char *a, char *b, int position);
 char *substring(char *string, int position, int length);
-void http_301_response(char *resp, const http_request_t *request, unsigned short port);
+void http_301_response(char *resp, const http_request_t *request,
+                       unsigned short port);
 
 void http_init_response_headers(http_response_t *response, bool compressed);
 void http_init_request_headers(http_link_context_t *context);
@@ -144,4 +133,4 @@ static http_parser_settings resp_parser_settings =
 };
 // clang-format on
 
-#endif // _BPROXY_HTTP_H_
+#endif  // _BPROXY_HTTP_H_

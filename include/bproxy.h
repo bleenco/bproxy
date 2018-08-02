@@ -8,14 +8,14 @@
 #ifndef _BPROXY_BPROXY_H_
 #define _BPROXY_BPROXY_H_
 
+#include <ctype.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <getopt.h>
 
-#include "http_link.h"
 #include "config.h"
+#include "http_link.h"
 #include "version.h"
 
 #include "openssl/bio.h"
@@ -26,14 +26,12 @@
 
 #include "uv_ssl_t.h"
 
-typedef struct
-{
+typedef struct {
   uv_write_t req;
   uv_buf_t buf;
 } write_req_t;
 
-typedef struct server_t
-{
+typedef struct server_t {
   uv_loop_t *loop;
   uv_tcp_t tcp;
   uv_tcp_t secure_tcp;
@@ -43,8 +41,7 @@ typedef struct server_t
   char *config_file;
 } server_t;
 
-typedef struct conn_s
-{
+typedef struct conn_s {
   proxy_config_t *config;
   uv_stream_t *handle;
   bool handle_flushed;
@@ -89,4 +86,4 @@ static int server_listen(unsigned short port, uv_tcp_t *tcp);
 void parse_args(int argc, char **argv);
 void usage();
 
-#endif // _BPROXY_BPROXY_H_
+#endif  // _BPROXY_BPROXY_H_
