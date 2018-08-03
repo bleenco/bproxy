@@ -141,13 +141,13 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[],
   size_t resp_size = nread;
 
   if (nread > 0) {
-    int headers_len = 0;
+    int header_len = 0;
     int body_len = 0;
 
     if (context->initial_reply) {
+      context->initial_reply = false;
+      // Init parser and set status line len
       http_parser_init(&response->parser, HTTP_RESPONSE);
-      http_parser_execute(&response->parser, &resp_parser_settings, resp,
-                          nread);
 
       // Parse status line
       size_t status_line_len;
@@ -162,18 +162,46 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[],
 
       memcpy(response->status_line, resp, status_line_len);
       response->status_line[status_line_len] = '\0';
+
+      // Log output
+      double timeDiff = (uv_hrtime() - context->request_time) / 1000000.0;
+      struct tm *timeinfo;
+      timeinfo = localtime(&context->request_timestamp);
+      char timeString[256];
+      strftime(timeString, sizeof(timeString), "%d/%b/%Y:%T %z", timeinfo);
+      // IP - [response time] - [date time] "GET url http" HTTP_STATUS_NUM host
+      log_debug("%s - [%.3fms] - [%s] \"%s\" %u %s", context->peer_ip, timeDiff,
+                timeString, context->request.status_line,
+                response->parser.status_code, context->request.host);
+    }
+    if (!context->response.headers_received) {
+      // Keep parsing until all headers have arrived
+      // Because parser quits on headers received, parsed length means header
+      // length. Added +1, because parser doesn't count last LF after headers
+      header_len = http_parser_execute(&response->parser, &resp_parser_settings,
+                                       resp, nread) +
+                   1;
+    }
+    if (!context->response.headers_received) {
+      // Headers not yet received, free response and nothing else
+      free(resp);
+      resp = NULL;
+      return 0;
+    }
+    if (context->response.headers_received && !context->response.headers_send) {
+      // Headers have arrived , but are not yet processed
+      // Init headers response and check if body follows headers
       bool use_compression = context->type == TYPE_REQUEST &&
                              context->request.enable_compression &&
                              response->enable_compression;
       http_init_response_headers(response, use_compression);
-
       // Get body start and body length
-      headers_len = strstr(resp, "\r\n\r\n") - resp + 4;  // 4 is for \r\n\r\n
-      body_len = nread - headers_len;
+      body_len = nread - header_len;
       response->body_size = body_len;
     }
     if (context->type == TYPE_REQUEST && context->request.enable_compression &&
         response->enable_compression) {
+      context->response.headers_send = true;
       if (response->gzip_state == NULL) {
         response->gzip_state = malloc(sizeof *response->gzip_state);
         gzip_init_state(response->gzip_state, response->http_header);
@@ -183,7 +211,7 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[],
         if (body_len > 0) {
           free(response->raw_body);
           response->raw_body = malloc(body_len);
-          memcpy(response->raw_body, &resp[headers_len], body_len);
+          memcpy(response->raw_body, &resp[header_len], body_len);
 
           compress_data(response, response->raw_body, response->body_size,
                         &resp, &resp_size);
@@ -194,28 +222,16 @@ int http_link_write(uv_link_t *link, uv_link_t *source, const uv_buf_t bufs[],
       }
     } else {
       // Add Via header
-      if (context->initial_reply) {
+      if (!context->response.headers_send) {
+        context->response.headers_send = true;
         char *tmp_resp = malloc(response->http_header_len + body_len);
         memcpy(tmp_resp, response->http_header, response->http_header_len);
-        memcpy(&tmp_resp[response->http_header_len], &resp[headers_len],
+        memcpy(&tmp_resp[response->http_header_len], &resp[header_len],
                body_len);
         free(resp);
         resp = tmp_resp;
         resp_size = response->http_header_len + body_len;
       }
-    }
-
-    if (context->initial_reply) {
-      context->initial_reply = false;
-      double timeDiff = (uv_hrtime() - context->request_time) / 1000000.0;
-      struct tm *timeinfo;
-      timeinfo = localtime(&context->request_timestamp);
-      char timeString[256];
-      strftime(timeString, sizeof(timeString), "%d/%b/%Y:%T %z", timeinfo);
-      // IP - [response time] - [date time] "GET url http" HTTP_STATUS_NUM host
-      log_debug("%s - [%.3fms] - [%s] \"%s\" %u %s", context->peer_ip, timeDiff,
-                timeString, context->request.status_line,
-                response->parser.status_code, context->request.host);
     }
   }
   uv_buf_t tmp_buf = uv_buf_init(resp, resp_size);
