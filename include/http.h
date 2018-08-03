@@ -72,6 +72,8 @@ typedef struct http_response_s {
   int http_header_len;
   char status_line[256];
   boolean enable_compression;
+  boolean headers_received;
+  boolean headers_send;
   gzip_state_t *gzip_state;
 } http_response_t;
 

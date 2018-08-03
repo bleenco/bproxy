@@ -247,6 +247,7 @@ int response_headers_complete_cb(http_parser *p) {
   if (already_compressed) {
     response->enable_compression = false;
   }
+  response->headers_received = true;
   return -1;
 }
 
